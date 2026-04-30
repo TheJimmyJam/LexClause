@@ -75,15 +75,6 @@ export default function Layout() {
       </nav>
 
       <div className="px-3 py-3 border-t border-white/8 space-y-2">
-        <a
-          href="https://lexalloc.netlify.app"
-          target="_blank" rel="noreferrer"
-          className="flex items-center justify-between px-3 py-2 text-xs text-slate-400 hover:text-slate-200 rounded-lg hover:bg-white/5"
-        >
-          <span>Open LexAlloc</span>
-          <span className="text-slate-500">↗</span>
-        </a>
-
         <button
           onClick={toggleDark}
           className="flex w-full items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/8 rounded-lg"
@@ -96,7 +87,7 @@ export default function Layout() {
         {profile && (
           <div className="px-3 py-2 text-xs text-slate-400 truncate">
             {profile.first_name || ''} {profile.last_name || ''}
-            <div className="text-slate-500 truncate">{profile.la_organizations?.name || ''}</div>
+            <div className="text-slate-500 truncate">{profile.organization?.name || ''}</div>
           </div>
         )}
 
