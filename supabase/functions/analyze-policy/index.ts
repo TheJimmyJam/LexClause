@@ -66,33 +66,81 @@ Rules:
 - state_issued: 2-letter US postal code from the declarations or filings; null if absent.
 - Output MUST be valid JSON. No prose, no markdown fences, just the JSON.`
 
-const ALLOCATE_SYSTEM = `You are a coverage attorney drafting a methodology memo for a multi-policy allocation. You will be given the matter facts, the relevant policies (already extracted), and the controlling state's allocation rule. Produce ONE JSON object — no prose, no markdown:
+const ALLOCATE_SYSTEM = `You are a coverage attorney producing a defensible per-carrier allocation. You will receive: the matter facts, the policies (already extracted) with limits/attachment_point/SIR/other-insurance language, and the controlling state's default rule.
+
+Treat insurance as a TOWER, not a flat pool. Apply this method, in order:
+
+1. CLASSIFY each policy by layer:
+   - "primary"  — attachment_point is null/0 AND policy_form is CGL_OCCURRENCE or CGL_CLAIMS_MADE
+   - "umbrella" — policy_form = UMBRELLA (sits above primary, often follows-form, may carry its own SIR)
+   - "excess"   — policy_form = EXCESS (follows form of underlying; pure excess)
+   The attachment_point is the dollar amount of underlying coverage that must be exhausted before this layer responds.
+
+2. CHOOSE THE TRIGGER:
+   - Single-event / single-occurrence loss → state's actual-injury or manifestation rule
+   - Long-tail loss (continuous exposure period) → state's continuous-trigger / injury-in-fact rule
+
+3. IDENTIFY TRIGGERED POLICIES:
+   - Single-event: every policy in force on the loss date
+   - Long-tail: every policy whose period overlaps the injury period
+
+4. BUILD THE TOWER(S):
+   - Sort triggered policies by (policy_year, attachment_point ASC)
+   - For long-tail with continuous trigger: one tower per triggered year
+
+5. ALLOCATE THE LOSS THROUGH THE TOWER(S) — sequentially, layer by layer:
+   a. Apply each policy's SIR/deductible — that money comes from the insured, not the carrier. Track this as insured_retention.
+   b. PRIMARY LAYER: co-primary insurers share the primary layer per the controlling rule:
+      - state default (pro-rata-by-time, pro-rata-by-limits, equal shares, targeted tender, all-sums)
+      - modified by other-insurance clauses (PRIMARY / EXCESS / PRO_RATA / ESCAPE / EXCESS_OVER_OTHER)
+      - "Primary and Non-Contributory" only fires when triggered by a written contract on an additional insured; if no such contract is established in the facts, treat the policy as a normal co-primary
+      - "Mutually repugnant" excess-vs-excess clauses → fall back to state default (often pro-rata or equal shares)
+   c. After primary is exhausted, UMBRELLA attaches at its attachment_point up to its own limit.
+   d. After umbrella, each EXCESS layer attaches sequentially.
+   e. Stop once damages_exposure is fully allocated.
+
+6. LONG-TAIL with multi-year triggers:
+   - States like NJ (Owens-Illinois), NY (Consol Edison), MA (Boston Gas), PA, FL: pro-rata-by-time-on-risk first, allocating exposure across triggered years; then within each year apply step 5
+   - States like CA (Montrose II), OH (Goodyear), WA (B&L Trucking): all-sums — insured may pick any one triggered policy and demand full payment up to limits, with rights of contribution; do NOT split across years unless asked
+   - IL targeted-tender: only the targeted carriers contribute; equal shares among them
+   - Vertical vs. horizontal exhaustion turns on the state — note it explicitly when relevant
+
+7. SUM CHECK (the most important step):
+   - Sum of all results[].allocated_amount + insured_retention MUST equal matter.damages_exposure (within $1)
+   - Each results[].allocated_amount MUST be ≤ that policy's applicable_limit at its layer
+   - If you can't satisfy these constraints, set allocation_method = "undetermined" and explain what's missing
+
+OUTPUT — ONE JSON object, no prose, no markdown:
 
 {
   "allocation_method": "pro_rata_time_on_risk"|"pro_rata_by_limits"|"all_sums"|"all_sums_with_reallocation"|"equal_shares"|"targeted_tender"|"undetermined",
   "trigger_theory": "exposure"|"manifestation"|"continuous_trigger"|"injury_in_fact"|"actual_injury"|"undetermined",
+  "tower_explanation": string,           // 2-4 sentences describing the layer structure (e.g. "Two co-primary CGL policies at $1M each share the first $1M; Liberty Mutual umbrella attaches at $1M with $25k SIR and a $5M limit covering the next $475k; insured pays $25k SIR.")
+  "insured_retention": number,           // total $ the insured pays out-of-pocket (sum of SIRs/deductibles that hit before insurance pays at the relevant layer; 0 if all coverage is first-dollar)
   "results": [
     {
-      "policy_id": string,
+      "policy_id": string,               // echo back the UUID from input — use exact string match; if unsure, leave as the policy_number
       "carrier": string,
       "policy_number": string,
       "policy_effective": "YYYY-MM-DD",
       "policy_expiration": "YYYY-MM-DD",
       "policy_state_issued": string,
-      "share_pct": number,
-      "allocated_amount": number,
-      "rationale": string
+      "layer": "primary"|"umbrella"|"excess"|"self_insured",
+      "attachment_point": number,        // 0 for primary
+      "applicable_limit": number,        // per-occurrence or aggregate cap as it applies to this loss
+      "share_pct": number,               // this carrier's share of the TOTAL loss as a decimal 0..1 (sum of all results[].share_pct + insured_retention/damages_exposure must equal 1.0)
+      "allocated_amount": number,        // dollars this carrier owes
+      "rationale": string                // 1-3 sentences — why this carrier owes this much at this layer
     }
   ],
-  "methodology_text": string
+  "methodology_text": string             // 2-4 paragraph memo. Trigger choice. Layer structure. Why the controlling state's rule applies. Cite at least one controlling case from the governing state. Note any meaningful endorsement effects (Primary-Non-Contributory, anti-stacking, follows-form, etc.).
 }
 
-Rules:
-- Sum of share_pct must equal 1.0 (within 0.001).
-- Sum of allocated_amount must equal damages_exposure.
-- Cite at least one controlling case from the governing state in methodology_text.
-- If facts are insufficient (e.g. no damages exposure), set allocation_method = "undetermined" and explain what is missing.
-- methodology_text: 1-3 paragraphs. Trigger choice, allocation rule, why this rule applies under the governing state's law, citation.`
+INVARIANTS (verify before returning):
+- sum(results[].allocated_amount) + insured_retention === matter.damages_exposure (within $1)
+- each results[].allocated_amount <= results[].applicable_limit
+- at least one citation from the governing state in methodology_text
+- no fabricated cases — if you don't know a citation for the rule, say so instead of inventing one`
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 async function downloadAsBase64(supabase, bucket, storagePath) {
@@ -293,11 +341,13 @@ async function handleAllocate(supabase, matterId, opts = {}) {
     const parsed = parseJsonFromClaude(text)
 
     await supabase.from('lc_analyses').update({
-      allocation_method: parsed.allocation_method,
-      trigger_theory:    parsed.trigger_theory || triggerTheory,
-      methodology_text:  parsed.methodology_text,
-      status:            'complete',
-      raw_engine_output: parsed,
+      allocation_method:  parsed.allocation_method,
+      trigger_theory:     parsed.trigger_theory || triggerTheory,
+      methodology_text:   parsed.methodology_text,
+      tower_explanation:  parsed.tower_explanation ?? null,
+      insured_retention:  typeof parsed.insured_retention === 'number' ? parsed.insured_retention : null,
+      status:             'complete',
+      raw_engine_output:  parsed,
     }).eq('id', analysis.id)
 
     if (Array.isArray(parsed.results) && parsed.results.length) {
@@ -330,6 +380,9 @@ async function handleAllocate(supabase, matterId, opts = {}) {
           policy_effective:    row.policy_effective,
           policy_expiration:   row.policy_expiration,
           policy_state_issued: row.policy_state_issued,
+          layer:               row.layer ?? null,
+          attachment_point:    typeof row.attachment_point === 'number' ? row.attachment_point : null,
+          applicable_limit:    typeof row.applicable_limit === 'number' ? row.applicable_limit : null,
           share_pct:           row.share_pct,
           allocated_amount:    row.allocated_amount,
           rationale:           row.rationale,
