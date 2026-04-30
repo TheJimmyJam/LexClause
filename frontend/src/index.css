@@ -62,7 +62,7 @@
   .badge { @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium tracking-tight; }
 }
 
-/* ── Dark mode (mirrors LexAlloc) ───────────────────────────────────────── */
+/* ── Dark mode ──────────────────────────────────────────────────────────── */
 .dark body { background-color: #020617; }
 .dark .bg-white    { background-color: #1e293b; }
 .dark .bg-slate-50 { background-color: #1e293b; }
