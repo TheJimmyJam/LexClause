@@ -25,8 +25,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         <ThemeProvider>
           <App />
           <Toaster position="top-right" toastOptions={{
-            style: { background: '#0f172a', color: '#f1f5f9', borderRadius: '8px', border: '1px solid rgba(20,184,166,0.3)' },
-            success: { iconTheme: { primary: '#14b8a6', secondary: '#fff' } },
+            style: { background: '#0f172a', color: '#f1f5f9', borderRadius: '8px', border: '1px solid rgba(59,130,246,0.3)' },
+            success: { iconTheme: { primary: '#3b82f6', secondary: '#fff' } },
           }} />
         </ThemeProvider>
       </BrowserRouter>
