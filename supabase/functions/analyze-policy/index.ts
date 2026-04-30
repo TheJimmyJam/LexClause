@@ -385,6 +385,7 @@ async function startAllocate(supabase, matterId, opts: any = {}) {
   const userPayload = JSON.stringify({
     matter: {
       name:             matter.name,
+      description:      matter.description ?? null,
       loss_type:        matter.loss_type,
       loss_start_date:  matter.loss_start_date,
       loss_end_date:    matter.loss_end_date,
