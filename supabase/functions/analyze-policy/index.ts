@@ -165,6 +165,10 @@ function parseJsonFromClaude(text) {
 }
 
 async function callClaude({ system, userContent, max_tokens = 4096 }) {
+  return await callClaudeMessages(system, [{ role: 'user', content: userContent }], max_tokens)
+}
+
+async function callClaudeMessages(system, messages, max_tokens = 4096) {
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -172,18 +176,97 @@ async function callClaude({ system, userContent, max_tokens = 4096 }) {
       'x-api-key':         ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01',
     },
-    body: JSON.stringify({
-      model: CLAUDE_MODEL,
-      max_tokens,
-      system,
-      messages: [{ role: 'user', content: userContent }],
-    }),
+    body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens, system, messages }),
   })
   if (!r.ok) {
     const errText = await r.text()
     throw new Error(`Anthropic ${r.status}: ${errText.slice(0, 500)}`)
   }
   return await r.json()
+}
+
+// ── Allocation validator ────────────────────────────────────────────────────
+// Checks Claude's output against arithmetic invariants. Returns an array of
+// human-readable error objects; empty array means valid.
+function validateAllocation(parsed, matter, policies) {
+  const errors = []
+  const exposure = Number(matter.damages_exposure || 0)
+  const insuredRetention = Number(parsed.insured_retention || 0)
+  const results = Array.isArray(parsed.results) ? parsed.results : []
+
+  // 1. Sum check
+  const totalAllocated = results.reduce((s, r) => s + Number(r.allocated_amount || 0), 0)
+  const grandTotal = totalAllocated + insuredRetention
+  if (exposure > 0) {
+    const gap = Math.round(grandTotal - exposure)
+    if (Math.abs(gap) > 1) {
+      errors.push({
+        type: 'sum_mismatch',
+        message: `Sum of all allocated_amount ($${totalAllocated.toLocaleString()}) plus insured_retention ($${insuredRetention.toLocaleString()}) equals $${grandTotal.toLocaleString()}, but matter.damages_exposure is $${exposure.toLocaleString()}. The allocation is off by $${Math.abs(gap).toLocaleString()} (${gap > 0 ? 'over' : 'under'}). Adjust the per-carrier amounts (and/or insured_retention) so the totals reconcile exactly.`,
+      })
+    }
+  }
+
+  // 2. Per-row limit check (cross-checked against the actual policy data)
+  const policiesByKey = new Map()
+  const policiesById = new Map()
+  for (const p of policies) {
+    policiesByKey.set(`${(p.carrier || '').trim()}|${(p.policy_number || '').trim()}`, p)
+    policiesById.set(p.id, p)
+  }
+
+  for (const row of results) {
+    const allocated = Number(row.allocated_amount || 0)
+    const claimedLimit = Number(row.applicable_limit || 0)
+    const layer = row.layer
+
+    // Match to a real policy if possible
+    let realPolicy =
+      (row.policy_id && policiesById.get(row.policy_id)) ||
+      policiesByKey.get(`${(row.carrier || '').trim()}|${(row.policy_number || '').trim()}`) ||
+      null
+    const realLimit = realPolicy ? Number(realPolicy.per_occurrence_limit || 0) : 0
+
+    // a) self-asserted applicable_limit
+    if (claimedLimit > 0 && allocated > claimedLimit + 1) {
+      errors.push({
+        type: 'limit_exceeded',
+        carrier: row.carrier,
+        policy_number: row.policy_number,
+        message: `${row.carrier} (${row.policy_number}, ${layer || 'unknown layer'}): allocated_amount $${allocated.toLocaleString()} exceeds the applicable_limit you stated ($${claimedLimit.toLocaleString()}). Cap this row at the applicable_limit and reallocate the overflow to the next layer above (umbrella/excess) or to insured_retention.`,
+      })
+    }
+    // b) cross-check vs. extracted policy data
+    if (realLimit > 0 && allocated > realLimit + 1) {
+      errors.push({
+        type: 'real_limit_exceeded',
+        carrier: row.carrier,
+        policy_number: row.policy_number,
+        message: `${row.carrier} (${row.policy_number}): allocated_amount $${allocated.toLocaleString()} exceeds the per-occurrence limit on the extracted policy ($${realLimit.toLocaleString()}). The carrier cannot owe more than its policy limit.`,
+      })
+    }
+  }
+
+  // 3. share_pct sanity (sum should be ~1.0 once SIR fraction included)
+  if (exposure > 0 && results.length > 0) {
+    const shareTotal = results.reduce((s, r) => s + Number(r.share_pct || 0), 0)
+    const sirShare = insuredRetention / exposure
+    const grandShare = shareTotal + sirShare
+    if (Math.abs(grandShare - 1) > 0.01) {
+      errors.push({
+        type: 'share_pct_mismatch',
+        message: `Sum of results[].share_pct (${shareTotal.toFixed(4)}) plus insured_retention/damages_exposure (${sirShare.toFixed(4)}) equals ${grandShare.toFixed(4)}, but should equal 1.0000. Recompute the share_pct values so they reflect each row's allocated_amount divided by damages_exposure.`,
+      })
+    }
+  }
+
+  return errors
+}
+
+// Build a corrective follow-up prompt given the failures of a previous attempt.
+function buildRetryMessage(errors, exposure) {
+  const lines = errors.map((e, i) => `  ${i + 1}. ${e.message}`).join('\n')
+  return `Your previous answer failed the post-validation checks. Specifically:\n\n${lines}\n\nRules of correction:\n- Total of allocated_amount + insured_retention MUST equal $${exposure.toLocaleString()} exactly.\n- No allocated_amount may exceed its policy's per-occurrence limit.\n- Sum of share_pct + insured_retention/damages_exposure MUST equal 1.0000 (within 0.01).\n- Keep the same allocation_method and trigger_theory unless you now believe a different rule applies.\n- Return the FULL corrected JSON object — same shape as before. No prose, no markdown.`
 }
 
 // ── Mode: extract_terms ─────────────────────────────────────────────────────
@@ -332,45 +415,71 @@ async function handleAllocate(supabase, matterId, opts = {}) {
   if (aErr) throw aErr
 
   try {
-    const claudeResp = await callClaude({
-      system: ALLOCATE_SYSTEM,
-      userContent: [{ type: 'text', text: userPayload }],
-      max_tokens: 4096,
-    })
-    const text = claudeResp.content?.[0]?.text || ''
-    const parsed = parseJsonFromClaude(text)
+    // ── Validate-and-retry loop ──────────────────────────────────────────────
+    // Claude returns an answer; we run validateAllocation; if any invariants
+    // fail, we feed the violations back and ask for a corrected JSON. After
+    // MAX_ATTEMPTS, save what we have with validation_status='needs_review'.
+    const MAX_ATTEMPTS = 3
+    const conversation = [{ role: 'user', content: [{ type: 'text', text: userPayload }] }]
+    let parsed = null
+    let validationErrors = []
+    let attempt = 0
+
+    while (attempt < MAX_ATTEMPTS) {
+      attempt++
+      const claudeResp = await callClaudeMessages(ALLOCATE_SYSTEM, conversation, 4096)
+      const text = claudeResp.content?.[0]?.text || ''
+      try {
+        parsed = parseJsonFromClaude(text)
+      } catch (e) {
+        // Parse failure is itself a validation error — ask Claude to fix
+        validationErrors = [{ type: 'parse_error', message: `Your previous response was not valid JSON: ${String(e).slice(0, 200)}` }]
+        conversation.push({ role: 'assistant', content: text })
+        conversation.push({ role: 'user', content: buildRetryMessage(validationErrors, Number(matter.damages_exposure || 0)) })
+        continue
+      }
+      validationErrors = validateAllocation(parsed, matter, policies)
+      if (validationErrors.length === 0) break
+
+      // Failed — append the bad response + corrective prompt and try again
+      conversation.push({ role: 'assistant', content: text })
+      conversation.push({ role: 'user', content: buildRetryMessage(validationErrors, Number(matter.damages_exposure || 0)) })
+    }
+
+    const validationStatus = validationErrors.length === 0 ? 'valid' : 'needs_review'
 
     await supabase.from('lc_analyses').update({
-      allocation_method:  parsed.allocation_method,
-      trigger_theory:     parsed.trigger_theory || triggerTheory,
-      methodology_text:   parsed.methodology_text,
-      tower_explanation:  parsed.tower_explanation ?? null,
-      insured_retention:  typeof parsed.insured_retention === 'number' ? parsed.insured_retention : null,
-      status:             'complete',
-      raw_engine_output:  parsed,
+      allocation_method:    parsed?.allocation_method ?? null,
+      trigger_theory:       parsed?.trigger_theory || triggerTheory,
+      methodology_text:     parsed?.methodology_text ?? null,
+      tower_explanation:    parsed?.tower_explanation ?? null,
+      insured_retention:    typeof parsed?.insured_retention === 'number' ? parsed.insured_retention : null,
+      status:               'complete',
+      raw_engine_output:    parsed,
+      validation_status:    validationStatus,
+      validation_errors:    validationErrors.length > 0 ? validationErrors : null,
+      validation_attempts:  attempt,
     }).eq('id', analysis.id)
 
-    if (Array.isArray(parsed.results) && parsed.results.length) {
+    if (parsed && Array.isArray(parsed.results) && parsed.results.length) {
       // Map Claude's results back to real policy UUIDs by (carrier, policy_number).
-      // We can't trust Claude to echo the UUID character-perfect — it sometimes
-      // transcribes one wrong, which then fails the FK insert.
       const byKey = new Map()
       for (const p of policies) {
         byKey.set(`${(p.carrier || '').trim()}|${(p.policy_number || '').trim()}`, p.id)
-        // Also key by id alone as a fallback
         byKey.set(p.id, p.id)
       }
       const resolvePolicyId = (row) => {
         if (row.policy_id && byKey.has(row.policy_id)) return row.policy_id
         const k = `${(row.carrier || '').trim()}|${(row.policy_number || '').trim()}`
         if (byKey.has(k)) return byKey.get(k)
-        // Last resort: match by policy_number only
         for (const p of policies) {
           if ((p.policy_number || '').trim() === (row.policy_number || '').trim()) return p.id
         }
         return null
       }
 
+      // Replace any existing rows (from a previous failed attempt) with the latest
+      await supabase.from('lc_analysis_results').delete().eq('analysis_id', analysis.id)
       await supabase.from('lc_analysis_results').insert(
         parsed.results.map((row, i) => ({
           analysis_id:         analysis.id,
@@ -391,7 +500,13 @@ async function handleAllocate(supabase, matterId, opts = {}) {
       )
     }
 
-    return { ok: true, analysisId: analysis.id, parsed }
+    return {
+      ok: true,
+      analysisId: analysis.id,
+      validation_status: validationStatus,
+      validation_attempts: attempt,
+      validation_errors: validationErrors,
+    }
   } catch (e) {
     await supabase.from('lc_analyses').update({ status: 'failed', error: String(e?.message || e).slice(0, 1000) }).eq('id', analysis.id)
     throw e
