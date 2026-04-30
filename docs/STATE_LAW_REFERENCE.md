@@ -2,7 +2,7 @@
 
 > Plain-language summary of how each catalogued state allocates long-tail / multi-policy losses by default. **Not legal advice.** Always confirm current law before relying on this for a real matter — coverage law evolves.
 
-The same data lives, in machine-readable form, in `frontend/src/lib/stateLaw.js` and the Postgres table `pa_state_law_rules`. Keep all three in sync when you update a rule.
+The same data lives, in machine-readable form, in `frontend/src/lib/stateLaw.js` and the Postgres table `lc_state_law_rules`. Keep all three in sync when you update a rule.
 
 | State | Default method | Trigger | Horizontal exhaustion? | Targeted tender? | Anchor citations |
 |-------|----------------|---------|------------------------|------------------|------------------|
@@ -46,7 +46,7 @@ The matter screen lets the user enter all candidates; the analyzer runs once per
 
 ## States not yet in the catalog
 
-CO, CT, GA, MI, MN, MO, NC, OR, VA, WI, et al. — flagged as `UNDETERMINED` until added. When a matter forces the issue, add the rule to `stateLaw.js`, `pa_state_law_rules`, and this table.
+CO, CT, GA, MI, MN, MO, NC, OR, VA, WI, et al. — flagged as `UNDETERMINED` until added. When a matter forces the issue, add the rule to `stateLaw.js`, `lc_state_law_rules`, and this table.
 
 ## Source-of-truth discipline
 
