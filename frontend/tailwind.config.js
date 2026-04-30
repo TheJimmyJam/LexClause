@@ -8,7 +8,7 @@ export default {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
       },
       colors: {
-        // LexClause brand: teal.
+        // LexClause brand: blue (matches the wordmark gradient — see logo-name.png).
         brand: {
           50:  'var(--brand-50)',
           100: 'var(--brand-100)',
