@@ -360,7 +360,13 @@ async function handleExtract(supabase, policyId) {
 }
 
 // ── Mode: allocate ──────────────────────────────────────────────────────────
-async function handleAllocate(supabase, matterId, opts = {}) {
+//
+// Split into two phases so the HTTP handler can return an analysisId
+// immediately and then process the (slow) Claude validate+retry loop in the
+// background via EdgeRuntime.waitUntil. The frontend polls lc_analyses.status
+// for completion.
+
+async function startAllocate(supabase, matterId, opts: any = {}) {
   const { data: matter } = await supabase
     .from('lc_matters')
     .select('*, lc_matter_policies(policy_id, role, lc_policies(*))')
@@ -420,6 +426,11 @@ async function handleAllocate(supabase, matterId, opts = {}) {
     .single()
   if (aErr) throw aErr
 
+  return { analysis, matter, policies, governingState, triggerTheory, userPayload }
+}
+
+async function processAllocate(supabase, ctx) {
+  const { analysis, matter, policies, triggerTheory, userPayload } = ctx
   try {
     // ── Validate-and-retry loop ──────────────────────────────────────────────
     // Claude returns an answer; we run validateAllocation; if any invariants
@@ -519,12 +530,19 @@ async function handleAllocate(supabase, matterId, opts = {}) {
   }
 }
 
+// Convenience wrapper for synchronous (wait=true) callers — keeps the old
+// behaviour of returning the full result.
+async function handleAllocateSync(supabase, matterId, opts) {
+  const ctx = await startAllocate(supabase, matterId, opts)
+  return await processAllocate(supabase, ctx)
+}
+
 // ── HTTP entrypoint ─────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride } = await req.json()
+    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, wait } = await req.json()
 
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -539,8 +557,42 @@ serve(async (req) => {
 
     if (mode === 'allocate') {
       if (!matterId) throw new Error('matterId required')
-      const out = await handleAllocate(supabase, matterId, { governingStateOverride, triggerTheoryOverride })
-      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      const opts = { governingStateOverride, triggerTheoryOverride }
+
+      // Sync mode for testing / callers that need the full result inline
+      if (wait === true) {
+        const out = await handleAllocateSync(supabase, matterId, opts)
+        return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      // Default: async — return analysisId immediately and process in background
+      const ctx = await startAllocate(supabase, matterId, opts)
+      const work = processAllocate(supabase, ctx).catch(async (e) => {
+        console.error('processAllocate failed', e)
+        try {
+          await supabase.from('lc_analyses').update({
+            status: 'failed',
+            error:  String(e?.message || e).slice(0, 1000),
+          }).eq('id', ctx.analysis.id)
+        } catch (innerErr) {
+          console.error('failed to mark analysis failed', innerErr)
+        }
+      })
+
+      // Keep the function alive after returning so the work can finish.
+      // EdgeRuntime is provided by Supabase's Deno runtime; the typeof guard
+      // means tests/local Deno still work (the work just runs synchronously).
+      // @ts-ignore — EdgeRuntime is a Supabase global
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(work)
+      }
+
+      return new Response(JSON.stringify({
+        ok: true,
+        analysisId: ctx.analysis.id,
+        status: 'running',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
     return new Response(JSON.stringify({ error: 'unknown mode' }), {
