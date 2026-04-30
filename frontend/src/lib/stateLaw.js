@@ -156,6 +156,123 @@ export const STATE_RULES = {
     horizontalExhaustion: false,
     targetedTenderAllowed: false,
   },
+
+  // ── TIER 2 — added migration 005 ──────────────────────────────────────────
+  CT: {
+    name: 'Connecticut',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time-on-risk for long-tail occurrences; continuous trigger generally applies.',
+    citations: [
+      'Sec. Ins. Co. of Hartford v. Lumbermens Mut. Cas. Co., 264 Conn. 688 (2003)',
+      'R.T. Vanderbilt Co. v. Hartford Accident & Indem. Co., 333 Conn. 343 (2019)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  CO: {
+    name: 'Colorado',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time-on-risk for environmental and other long-tail losses (Wallis).',
+    citations: [
+      'Public Service Co. of Colorado v. Wallis & Companies, 986 P.2d 924 (Colo. 1999)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  MN: {
+    name: 'Minnesota',
+    defaultMethod: ALLOCATION_METHOD.ALL_SUMS,
+    trigger: TRIGGER_THEORY.ACTUAL_INJURY,
+    notes: 'Joint-and-several / all-sums under Silicone Implant; insured may target one triggered policy.',
+    citations: [
+      'In re Silicone Implant Ins. Coverage Litig., 667 N.W.2d 405 (Minn. 2003)',
+      'Northern States Power Co. v. Fidelity & Cas. Co. of N.Y., 523 N.W.2d 657 (Minn. 1994)',
+    ],
+    horizontalExhaustion: false,
+    targetedTenderAllowed: false,
+  },
+  IN: {
+    name: 'Indiana',
+    defaultMethod: ALLOCATION_METHOD.ALL_SUMS,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'All-sums under Dana Corp.; insured may pick any triggered policy with rights of contribution.',
+    citations: [
+      'Allstate Ins. Co. v. Dana Corp., 759 N.E.2d 1049 (Ind. 2001)',
+    ],
+    horizontalExhaustion: false,
+    targetedTenderAllowed: false,
+  },
+  WI: {
+    name: 'Wisconsin',
+    defaultMethod: ALLOCATION_METHOD.ALL_SUMS_WITH_REALLOC,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'All-sums with subsequent reallocation among co-insurers (Plastics Engineering).',
+    citations: [
+      "Plastics Eng'g Co. v. Liberty Mut. Ins. Co., 759 N.W.2d 613 (Wis. 2009)",
+    ],
+    horizontalExhaustion: false,
+    targetedTenderAllowed: false,
+  },
+  MO: {
+    name: 'Missouri',
+    defaultMethod: ALLOCATION_METHOD.ALL_SUMS,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Joint-and-several / all-sums for long-tail environmental claims under Doe Run.',
+    citations: [
+      'Doe Run Resources Corp. v. American Guar. & Liab. Ins., 531 S.W.3d 508 (Mo. 2017)',
+    ],
+    horizontalExhaustion: false,
+    targetedTenderAllowed: false,
+  },
+  DE: {
+    name: 'Delaware',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time-on-risk for environmental long-tail (Hercules).',
+    citations: [
+      'Hercules Inc. v. AIU Ins. Co., 784 A.2d 481 (Del. 2001)',
+      'In re Viking Pump Inc., 148 A.3d 633 (Del. 2016)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  NC: {
+    name: 'North Carolina',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.INJURY_IN_FACT,
+    notes: 'Pro-rata-by-time on injury-in-fact for long-tail damage.',
+    citations: [
+      'Gaston County Dyeing Mach. Co. v. Northfield Ins. Co., 351 N.C. 293 (2000)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  GA: {
+    name: 'Georgia',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Continuous-trigger / pro-rata for environmental and progressive-damage occurrences.',
+    citations: [
+      'Continental Cas. Co. v. H.S.I. Fin. Servs., 266 Ga. 260 (1996)',
+      'HDI-Gerling America Ins. Co. v. Morrison Homes, Inc., 701 F.3d 662 (11th Cir. 2012)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  OR: {
+    name: 'Oregon',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time mandated by ORS 465.480 for environmental claims; common law follows similar approach for other long-tail losses.',
+    citations: [
+      'ORS 465.480 (Oregon Environmental Cleanup Assistance Act)',
+      'Lamb-Weston, Inc. v. Or. Auto. Ins. Co., 219 Or. 110 (1959)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
   // ── Stub the rest with UNDETERMINED so the analyzer at least labels the gap ──
 }
 
