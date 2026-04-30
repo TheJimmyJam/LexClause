@@ -4,6 +4,8 @@
 
 The same data lives, in machine-readable form, in `frontend/src/lib/stateLaw.js` and the Postgres table `lc_state_law_rules`. Keep all three in sync when you update a rule.
 
+### Tier 1 — Most-litigated coverage states
+
 | State | Default method | Trigger | Horizontal exhaustion? | Targeted tender? | Anchor citations |
 |-------|----------------|---------|------------------------|------------------|------------------|
 | CA    | All-sums | Continuous | No (vertical OK) | No | *Montrose I* (1995); *Montrose II* (2020) |
@@ -16,6 +18,21 @@ The same data lives, in machine-readable form, in `frontend/src/lib/stateLaw.js`
 | FL    | Pro-rata by time | Injury-in-fact (varies) | Yes | No | *Trizec Props.* (1985) |
 | WA    | All-sums | Continuous | No | No | *B&L Trucking* (1998) |
 | OH    | All-sums | Continuous | No | No | *Goodyear v. Aetna* (2002) |
+
+### Tier 2 — Established rule, less litigated
+
+| State | Default method | Trigger | Horizontal exhaustion? | Anchor citations |
+|-------|----------------|---------|------------------------|------------------|
+| CT    | Pro-rata by time | Continuous | Yes | *Sec. Ins. Co. of Hartford v. Lumbermens* (2003); *R.T. Vanderbilt* (2019) |
+| CO    | Pro-rata by time | Continuous | Yes | *Public Service Co. of Colorado v. Wallis* (1999) |
+| MN    | All-sums | Actual injury | No | *Silicone Implant Litig.* (2003); *Northern States Power* (1994) |
+| IN    | All-sums | Continuous | No | *Allstate v. Dana Corp.* (2001) |
+| WI    | All-sums w/ reallocation | Continuous | No | *Plastics Eng'g v. Liberty Mut.* (2009) |
+| MO    | All-sums | Continuous | No | *Doe Run v. American Guarantee* (2017) |
+| DE    | Pro-rata by time | Continuous | Yes | *Hercules v. AIU* (2001); *Viking Pump (Del.)* (2016) |
+| NC    | Pro-rata by time | Injury-in-fact | Yes | *Gaston County Dyeing v. Northfield* (2000) |
+| GA    | Pro-rata by time | Continuous | Yes | *Continental Cas. v. H.S.I. Fin.* (1996); *HDI-Gerling v. Morrison Homes* (2012) |
+| OR    | Pro-rata by time | Continuous | Yes | ORS 465.480; *Lamb-Weston v. Or. Auto. Ins.* (1959) |
 
 ## How to read this table
 
@@ -46,7 +63,9 @@ The matter screen lets the user enter all candidates; the analyzer runs once per
 
 ## States not yet in the catalog
 
-CO, CT, GA, MI, MN, MO, NC, OR, VA, WI, et al. — flagged as `UNDETERMINED` until added. When a matter forces the issue, add the rule to `stateLaw.js`, `lc_state_law_rules`, and this table.
+20 states are seeded above. The remaining ~30 (AL, AK, AZ, AR, DC, HI, ID, IA, KS, KY, LA, ME, MD, MI, MS, MT, NE, NV, NH, NM, ND, OK, RI, SC, SD, TN, UT, VT, VA, WV, WY, et al.) return `UNDETERMINED` from the analyzer. When a matter forces the issue, add the rule to `stateLaw.js`, `lc_state_law_rules`, and this table.
+
+Michigan, Virginia, and Maryland are notable omissions — they have well-established rules but the law has shifted enough that current authority should be verified before seeding (e.g., MI's path through *Arco Industries* and its progeny, VA's narrow manifestation-trigger rule, MD's pro-rata-by-time line). Treat them as next in the queue.
 
 ## Source-of-truth discipline
 
