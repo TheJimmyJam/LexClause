@@ -21,8 +21,15 @@ export default function Analysis() {
 
   if (!analysis) return <div className="p-10 text-center text-slate-500">Loading analysis…</div>
 
-  const results = analysis.lc_analysis_results || []
+  const results = (analysis.lc_analysis_results || []).slice().sort((a, b) => {
+    const layerOrder = { primary: 0, umbrella: 1, excess: 2, self_insured: 3 }
+    const la = layerOrder[a.layer] ?? 99, lb = layerOrder[b.layer] ?? 99
+    if (la !== lb) return la - lb
+    return (a.attachment_point || 0) - (b.attachment_point || 0)
+  })
   const total = results.reduce((acc, r) => acc + Number(r.allocated_amount || 0), 0)
+  const insuredRetention = Number(analysis.insured_retention || 0)
+  const grandTotal = total + insuredRetention
 
   return (
     <div className="p-6 lg:p-10 max-w-5xl mx-auto">
@@ -38,11 +45,18 @@ export default function Analysis() {
         <button className="btn-secondary"><Download className="h-4 w-4" /> Export memo</button>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-3 mb-8">
+      <div className="grid sm:grid-cols-3 gap-3 mb-6">
         <Stat label="Governing law"     value={analysis.governing_state} />
         <Stat label="Allocation method" value={(analysis.allocation_method || '').replaceAll('_', ' ')} />
         <Stat label="Trigger"           value={(analysis.trigger_theory || '').replaceAll('_', ' ')} />
       </div>
+
+      {analysis.tower_explanation && (
+        <div className="card p-5 mb-6 border-brand-200/60 bg-brand-50/30">
+          <div className="text-xs uppercase tracking-wide text-brand-700 font-semibold mb-2">Tower structure</div>
+          <p className="text-sm text-slate-700 leading-relaxed">{analysis.tower_explanation}</p>
+        </div>
+      )}
 
       <div className="card overflow-hidden mb-8">
         <div className="px-5 py-4 border-b border-slate-100">
@@ -54,28 +68,46 @@ export default function Analysis() {
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-500">
               <tr>
+                <th className="px-4 py-3 font-semibold">Layer</th>
                 <th className="px-4 py-3 font-semibold">Carrier</th>
                 <th className="px-4 py-3 font-semibold">Policy #</th>
-                <th className="px-4 py-3 font-semibold">Period</th>
+                <th className="px-4 py-3 font-semibold text-right">Attach</th>
+                <th className="px-4 py-3 font-semibold text-right">Limit</th>
                 <th className="px-4 py-3 font-semibold text-right">Share</th>
                 <th className="px-4 py-3 font-semibold text-right">Allocated $</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {results.map(r => (
-                <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium text-slate-900">{r.carrier}</td>
-                  <td className="px-4 py-3 text-slate-600 font-mono text-xs">{r.policy_number}</td>
-                  <td className="px-4 py-3 text-slate-600 text-xs">
-                    {r.policy_effective} → {r.policy_expiration}
+                <tr key={r.id} className="hover:bg-slate-50 align-top">
+                  <td className="px-4 py-3"><LayerBadge layer={r.layer} /></td>
+                  <td className="px-4 py-3 font-medium text-slate-900">
+                    {r.carrier}
+                    {r.rationale && (
+                      <div className="text-xs text-slate-500 mt-1 font-normal leading-relaxed">{r.rationale}</div>
+                    )}
                   </td>
+                  <td className="px-4 py-3 text-slate-600 font-mono text-xs whitespace-nowrap">{r.policy_number}</td>
+                  <td className="px-4 py-3 text-right text-slate-600 font-mono text-xs">{fmtMoneyOrDash(r.attachment_point)}</td>
+                  <td className="px-4 py-3 text-right text-slate-600 font-mono text-xs">{fmtMoneyOrDash(r.applicable_limit)}</td>
                   <td className="px-4 py-3 text-right text-slate-700">{(Number(r.share_pct) * 100).toFixed(2)}%</td>
                   <td className="px-4 py-3 text-right font-mono">${Number(r.allocated_amount || 0).toLocaleString()}</td>
                 </tr>
               ))}
+              {insuredRetention > 0 && (
+                <tr className="hover:bg-slate-50">
+                  <td className="px-4 py-3"><LayerBadge layer="self_insured" /></td>
+                  <td className="px-4 py-3 font-medium text-slate-900">Insured retention</td>
+                  <td className="px-4 py-3 text-slate-400 font-mono text-xs">—</td>
+                  <td className="px-4 py-3 text-right text-slate-400 font-mono text-xs">—</td>
+                  <td className="px-4 py-3 text-right text-slate-400 font-mono text-xs">—</td>
+                  <td className="px-4 py-3 text-right text-slate-700">{((insuredRetention / grandTotal) * 100).toFixed(2)}%</td>
+                  <td className="px-4 py-3 text-right font-mono">${insuredRetention.toLocaleString()}</td>
+                </tr>
+              )}
               <tr className="bg-slate-50 font-semibold">
-                <td colSpan={4} className="px-4 py-3 text-right">Total</td>
-                <td className="px-4 py-3 text-right font-mono">${total.toLocaleString()}</td>
+                <td colSpan={6} className="px-4 py-3 text-right">Total</td>
+                <td className="px-4 py-3 text-right font-mono">${grandTotal.toLocaleString()}</td>
               </tr>
             </tbody>
           </table>
@@ -99,4 +131,20 @@ function Stat({ label, value }) {
       <div className="text-slate-900 font-medium">{value || '—'}</div>
     </div>
   )
+}
+
+function LayerBadge({ layer }) {
+  const map = {
+    primary:      { label: 'Primary',  cls: 'bg-emerald-100 text-emerald-800' },
+    umbrella:     { label: 'Umbrella', cls: 'bg-amber-100 text-amber-800' },
+    excess:       { label: 'Excess',   cls: 'bg-purple-100 text-purple-800' },
+    self_insured: { label: 'SIR',      cls: 'bg-slate-200 text-slate-700' },
+  }
+  const m = map[layer] || { label: '—', cls: 'bg-slate-100 text-slate-500' }
+  return <span className={`badge ${m.cls}`}>{m.label}</span>
+}
+
+function fmtMoneyOrDash(n) {
+  if (n == null || n === '') return '—'
+  return `$${Number(n).toLocaleString()}`
 }
