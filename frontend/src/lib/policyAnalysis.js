@@ -35,6 +35,27 @@ export async function runAllocationAnalysis(matterId, opts = {}) {
 }
 
 /**
+ * Run N parallel allocations under different governing states. Returns
+ * { comparisonGroupId, analysisIds }. Frontend navigates to the comparison
+ * page which polls all N rows until each is complete.
+ */
+export async function runComparison(matterId, states, opts = {}) {
+  if (!Array.isArray(states) || states.length < 2) {
+    throw new Error('runComparison requires at least 2 states')
+  }
+  const { data, error } = await supabase.functions.invoke('analyze-policy', {
+    body: {
+      matterId,
+      mode: 'allocate',
+      comparisonStates: states,
+      triggerTheoryOverride: opts.triggerTheory || null,
+    },
+  })
+  if (error) throw error
+  return data
+}
+
+/**
  * What we expect Claude to extract from each policy. Documented here so the
  * Edge Function prompt + the database column shapes can stay in sync.
  */
