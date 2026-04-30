@@ -29,9 +29,9 @@ export default function Dashboard() {
     enabled: !!profile?.org_id,
     queryFn: async () => {
       const [{ count: policyCount }, { count: matterCount }, { count: analysisCount }] = await Promise.all([
-        supabase.from('pa_policies').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
-        supabase.from('pa_matters').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
-        supabase.from('pa_analyses').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
+        supabase.from('lc_policies').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
+        supabase.from('lc_matters').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
+        supabase.from('lc_analyses').select('*', { count: 'exact', head: true }).eq('org_id', profile.org_id),
       ])
       return {
         policies: policyCount  ?? 0,
