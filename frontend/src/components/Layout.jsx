@@ -1,0 +1,150 @@
+import { Outlet, NavLink, useNavigate, Link } from 'react-router-dom'
+import { useAuth } from '../hooks/useAuth.jsx'
+import { useTheme } from '../context/ThemeContext.jsx'
+import {
+  LayoutDashboard, FileText, FolderOpen, Settings, LogOut,
+  Menu, X, Moon, Sun, Scale,
+} from 'lucide-react'
+import { useState } from 'react'
+
+const navItems = [
+  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/policies',  icon: FileText,        label: 'Policies'  },
+  { to: '/matters',   icon: FolderOpen,      label: 'Matters'   },
+]
+
+export default function Layout() {
+  const { profile, signOut } = useAuth()
+  const { dark, toggle: toggleDark } = useTheme()
+  const navigate = useNavigate()
+  const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  const handleSignOut = async () => { await signOut(); navigate('/login') }
+
+  const NavItems = () => (
+    <>
+      {navItems.map(({ to, icon: Icon, label }) => (
+        <NavLink
+          key={to} to={to}
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+              isActive
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-white/8'
+            }`
+          }
+          onClick={() => setSidebarOpen(false)}
+        >
+          <Icon className="h-4 w-4 flex-shrink-0" />
+          {label}
+        </NavLink>
+      ))}
+      <NavLink
+        to="/settings"
+        className={({ isActive }) =>
+          `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+            isActive
+              ? 'bg-brand-600 text-white shadow-sm'
+              : 'text-slate-400 hover:text-slate-100 hover:bg-white/8'
+          }`
+        }
+        onClick={() => setSidebarOpen(false)}
+      >
+        <Settings className="h-4 w-4 flex-shrink-0" />
+        Settings
+      </NavLink>
+    </>
+  )
+
+  const SidebarContents = () => (
+    <>
+      <div className="px-4 py-5 border-b border-white/8">
+        <Link to="/dashboard" className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/20">
+            <Scale className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <div className="text-white font-bold text-lg leading-none">LexClause</div>
+            <div className="text-slate-400 text-[11px] mt-1">Coverage analysis</div>
+          </div>
+        </Link>
+      </div>
+
+      <nav className="flex-1 px-3 py-4 space-y-1">
+        <NavItems />
+      </nav>
+
+      <div className="px-3 py-3 border-t border-white/8 space-y-2">
+        <a
+          href="https://lexalloc.netlify.app"
+          target="_blank" rel="noreferrer"
+          className="flex items-center justify-between px-3 py-2 text-xs text-slate-400 hover:text-slate-200 rounded-lg hover:bg-white/5"
+        >
+          <span>Open LexAlloc</span>
+          <span className="text-slate-500">↗</span>
+        </a>
+
+        <button
+          onClick={toggleDark}
+          className="flex w-full items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/8 rounded-lg"
+          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          {dark ? 'Light mode' : 'Dark mode'}
+        </button>
+
+        {profile && (
+          <div className="px-3 py-2 text-xs text-slate-400 truncate">
+            {profile.first_name || ''} {profile.last_name || ''}
+            <div className="text-slate-500 truncate">{profile.la_organizations?.name || ''}</div>
+          </div>
+        )}
+
+        <button
+          onClick={handleSignOut}
+          className="flex w-full items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/8 rounded-lg"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign out
+        </button>
+      </div>
+    </>
+  )
+
+  return (
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-950">
+      {/* Mobile sidebar toggle */}
+      <button
+        onClick={() => setSidebarOpen(true)}
+        className="md:hidden fixed top-3 left-3 z-30 p-2 bg-slate-900 text-white rounded-lg shadow-lg"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
+
+      {/* Sidebar — desktop */}
+      <aside className="hidden md:flex md:flex-col w-64 bg-slate-900 border-r border-white/5">
+        <SidebarContents />
+      </aside>
+
+      {/* Sidebar — mobile drawer */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 z-40 flex">
+          <div className="fixed inset-0 bg-black/60" onClick={() => setSidebarOpen(false)} />
+          <aside className="relative flex flex-col w-64 bg-slate-900 border-r border-white/5">
+            <button
+              onClick={() => setSidebarOpen(false)}
+              className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-white"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <SidebarContents />
+          </aside>
+        </div>
+      )}
+
+      <main className="flex-1 overflow-auto">
+        <Outlet />
+      </main>
+    </div>
+  )
+}
