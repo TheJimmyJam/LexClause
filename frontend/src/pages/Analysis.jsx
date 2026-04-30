@@ -1,17 +1,22 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Download, AlertTriangle, CheckCircle2 } from 'lucide-react'
+import { ArrowLeft, Download, AlertTriangle, CheckCircle2, FileText, FileType, ChevronDown } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
+import { useAuth } from '../hooks/useAuth.jsx'
+import { downloadMemoDocx, downloadMemoPdf } from '../lib/generateCoverageMemo.js'
+import toast from 'react-hot-toast'
 
 export default function Analysis() {
   const { matterId, analysisId } = useParams()
+  const { profile } = useAuth()
 
   const { data: analysis } = useQuery({
     queryKey: ['lc_analysis', analysisId],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('lc_analyses')
-        .select('*, lc_analysis_results(*), lc_matters(name, governing_state, venue_state, loss_type)')
+        .select('*, lc_analysis_results(*), lc_matters(*)')
         .eq('id', analysisId)
         .single()
       if (error) throw error
@@ -42,7 +47,12 @@ export default function Analysis() {
           <h1 className="text-3xl font-bold text-slate-900">Coverage Allocation</h1>
           <p className="text-slate-600 mt-1">{analysis.lc_matters?.name}</p>
         </div>
-        <button className="btn-secondary"><Download className="h-4 w-4" /> Export memo</button>
+        <ExportMenu
+          analysis={analysis}
+          matter={analysis.lc_matters}
+          results={results}
+          organization={profile?.organization}
+        />
       </div>
 
       <ValidationBanner
@@ -153,6 +163,72 @@ function LayerBadge({ layer }) {
 function fmtMoneyOrDash(n) {
   if (n == null || n === '') return '—'
   return `$${Number(n).toLocaleString()}`
+}
+
+function ExportMenu({ analysis, matter, results, organization }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    function onDocClick(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDocClick)
+    return () => document.removeEventListener('mousedown', onDocClick)
+  }, [])
+
+  const exportAs = async (format) => {
+    if (busy) return
+    setBusy(true); setOpen(false)
+    try {
+      const payload = { analysis, matter, results, organization }
+      if (format === 'docx')      await downloadMemoDocx(payload)
+      else if (format === 'pdf')        downloadMemoPdf(payload)
+      toast.success(`Memo exported as ${format.toUpperCase()}`)
+    } catch (e) {
+      console.error(e)
+      toast.error(e.message || 'Export failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        disabled={busy}
+        className="btn-primary"
+      >
+        <Download className="h-4 w-4" />
+        {busy ? 'Generating…' : 'Export memo'}
+        <ChevronDown className="h-3.5 w-3.5 -mr-1 opacity-80" />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-modal z-20 overflow-hidden">
+          <button
+            onClick={() => exportAs('docx')}
+            className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-slate-50 text-left"
+          >
+            <FileText className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+            <div>
+              <div className="text-sm font-medium text-slate-900">Word (.docx)</div>
+              <div className="text-xs text-slate-500">Editable for further drafting</div>
+            </div>
+          </button>
+          <button
+            onClick={() => exportAs('pdf')}
+            className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-slate-50 text-left border-t border-slate-100"
+          >
+            <FileType className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+            <div>
+              <div className="text-sm font-medium text-slate-900">PDF</div>
+              <div className="text-xs text-slate-500">Finalized for filing or distribution</div>
+            </div>
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function ValidationBanner({ status, errors, attempts }) {
