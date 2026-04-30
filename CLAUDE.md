@@ -1,10 +1,10 @@
 # LexClause — Claude Session Reference
 
-Sister product to LexAlloc. Coverage-allocation analysis: how should multiple insurance policies share a single loss given the policy language, the trigger of coverage, and the controlling state law?
+Coverage-allocation analysis: how should multiple insurance policies share a single loss given the policy language, the trigger of coverage, and the controlling state law?
 
-## ⚠️ Folder layout (no nested duplicate this time)
+## Folder layout
 
-Unlike LexAlloc — which has a stale `/lexalloc/` subfolder in GitHub — LexClause lives at the repo root. **What I edit locally is what gets pushed.** Path translation is 1:1.
+LexClause lives at the repo root. **What I edit locally is what gets pushed.** Path translation is 1:1 — no nested duplicate folder, no special path mapping.
 
 ```
 LexClause/                              ← local + repo root
@@ -29,8 +29,8 @@ LexClause/                              ← local + repo root
 ## Stack
 
 - **Frontend**: React + Vite + Tailwind CSS (`darkMode: 'class'`, brand = teal)
-- **Backend**: Supabase — **shared with LexAlloc** (same project URL, same anon key, same auth, same la_profiles / la_organizations)
-- **LexClause tables**: prefixed `pa_` (LexAlloc uses `la_`)
+- **Backend**: Supabase — its own dedicated project (no shared backends)
+- **Tables**: prefixed `pa_` (policy-allocation namespace; the prefix is internal — users never see it)
 - **AI engine**: Edge Function `analyze-policy` calls Claude API. Frontend never touches the Anthropic key.
 - **Deploy**: Netlify, auto-deploys from GitHub `main`
 - **Repo**: `TheJimmyJam/LexClause`
@@ -40,7 +40,7 @@ LexClause/                              ← local + repo root
 | Route                                               | File              | Purpose |
 |-----------------------------------------------------|-------------------|---------|
 | `/`                                                 | Landing.jsx       | Marketing landing |
-| `/login`, `/register`, `/forgot-password`           | Login/Register/ForgotPassword | Auth (shares LexAlloc users) |
+| `/login`, `/register`, `/forgot-password`           | Login/Register/ForgotPassword | Auth |
 | `/dashboard`                                        | Dashboard.jsx     | Counts and quick actions |
 | `/policies`                                         | Policies.jsx      | Policy library |
 | `/policies/upload`                                  | PolicyUpload.jsx  | PDF dropzone → Edge Function extraction |
@@ -52,17 +52,19 @@ LexClause/                              ← local + repo root
 
 ## Key files
 
-- `src/lib/supabase.js`        — Supabase client (separate auth storageKey to avoid stomping LexAlloc's session)
+- `src/lib/supabase.js`        — Supabase client
 - `src/lib/policyAnalysis.js`  — Frontend wrapper for the `analyze-policy` Edge Function
 - `src/lib/stateLaw.js`        — State-law catalog (CA, NJ, NY, IL, MA, PA, TX, FL, WA, OH seeded)
-- `src/hooks/useAuth.jsx`      — Reuses `la_profiles` / `la_organizations`
-- `supabase/migrations/001_lexclause_init.sql` — pa_ tables, RLS, storage bucket, state-law seed
+- `src/hooks/useAuth.jsx`      — Reads from `pa_profiles` + `pa_organizations`
+- `supabase/migrations/001_lexclause_init.sql` — All pa_ tables + RLS + signup trigger + state-law seed + storage bucket
 - `supabase/functions/analyze-policy/index.ts` — Two modes: `extract_terms`, `allocate`
 
 ## Database — pa_ tables
 
 | Table                      | Purpose |
 |----------------------------|---------|
+| `pa_organizations`         | Tenant — one per signed-up firm |
+| `pa_profiles`              | One row per auth.users user; links to org_id |
 | `pa_policies`              | Policy library: limits, retentions, other-insurance language, extraction status |
 | `pa_policy_endorsements`   | Per-policy endorsements |
 | `pa_policy_exclusions`     | Per-policy exclusions |
@@ -72,16 +74,17 @@ LexClause/                              ← local + repo root
 | `pa_analysis_results`      | Per-policy share rows for an analysis |
 | `pa_state_law_rules`       | Overrideable state-law catalog (seeded; mirrors `stateLaw.js`) |
 
-RLS gating: every pa_ table is gated by `org_id = pa_user_org()` where `pa_user_org()` returns `la_profiles.org_id` for `auth.uid()`. LexClause auth uses the same profile row LexAlloc uses.
+RLS gating: every pa_ table is gated by `org_id = pa_user_org()`, where `pa_user_org()` returns `pa_profiles.org_id` for `auth.uid()`. Storage bucket `pa-policies`, files at `<org_id>/<timestamp>-<filename>.pdf`.
 
-Storage bucket: `pa-policies`, files at `<org_id>/<timestamp>-<filename>.pdf`.
+Signup flow: `Register.jsx` calls `supabase.auth.signUp()` with `org_name`, `first_name`, and `last_name` in `raw_user_meta_data`. The `handle_new_lexclause_user()` trigger on `auth.users` creates the `pa_organizations` row and the `pa_profiles` row in one shot, with the new user as `admin` of their fresh org.
 
 ## GitHub Push Script Template
 
 ```python
 import urllib.request, urllib.error, json, base64
 
-PAT   = 'ghp_xxxx...'  # see Jimmy's 1Password / desktop/projects/.credentials
+# Read PAT from ~/Desktop/Projects/.credentials (GITHUB_PAT_CLASSIC)
+PAT   = 'ghp_xxxx...'
 OWNER = 'TheJimmyJam'
 REPO  = 'LexClause'
 BASE  = f'https://api.github.com/repos/{OWNER}/{REPO}/contents'
@@ -103,15 +106,6 @@ def push(repo_path, local_path, msg):
     data = json.dumps(body).encode()
     req  = urllib.request.Request(f'{BASE}/{repo_path}', data=data, headers=H, method='PUT')
     with urllib.request.urlopen(req) as r: print(f'✓ {repo_path} ({r.status})')
-
-# Local → GitHub: paths are identical (no `lexclause/` prefix to strip)
-LOCAL_BASE = '/sessions/<session>/mnt/LexClause'
-
-push(
-    'frontend/src/pages/Landing.jsx',
-    f'{LOCAL_BASE}/frontend/src/pages/Landing.jsx',
-    'feat: landing copy tweak'
-)
 ```
 
 ## Netlify build config (repo root netlify.toml)
@@ -134,8 +128,8 @@ push(
 ## Required environment variables
 
 **Netlify (frontend)**
-- `VITE_SUPABASE_URL` — same value as LexAlloc
-- `VITE_SUPABASE_ANON_KEY` — same value as LexAlloc
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
 **Supabase Edge Function `analyze-policy` secrets**
 - `ANTHROPIC_API_KEY`
@@ -144,15 +138,17 @@ push(
 
 ## Pending / known gaps
 
+- LexClause needs its own dedicated Supabase project. Spin one up and wire the env vars (don't reuse LexAlloc's project — that has the LA tables and would cross-contaminate).
 - PDF text extraction is stubbed — `pa_policies.source_text` must be populated before `extract_terms` runs. Wire in a PDF parser (pdf-parse, or Anthropic's PDF input API) before going live.
 - State-law catalog covers 10 states. Round it out as matters demand — keep `stateLaw.js` and `pa_state_law_rules` in sync.
 - Memo export button is wired up visually but the export function isn't built yet.
-- No cross-link to LexAlloc matters in the UI (the `pa_matters.lexalloc_matter_id` column is in place).
+- No citation verifier on the methodology memo — Claude can fabricate plausible-sounding cases. Before any external user touches output, plug in a vetted citation library or a Westlaw/Lexis check.
 
 ## Brand color
 
-LexClause uses **teal** (teal-400 → teal-700) as the brand color to differentiate from LexAlloc's indigo. Tokens are in `src/index.css` under `:root { --brand-* }` and consumed via Tailwind's `brand-*` utility classes.
+LexClause uses **teal** (teal-400 → teal-700) as the brand color. Tokens are in `src/index.css` under `:root { --brand-* }` and consumed via Tailwind's `brand-*` utility classes.
 
 ## Recent changes
 
-- v0.1.0: Scaffolded full app (frontend, Supabase migration 001, Edge Function `analyze-policy`, state-law catalog, CLAUDE.md). Ready for first push to GitHub.
+- v0.2.0: Decoupled from LexAlloc — own pa_organizations + pa_profiles + signup trigger; landing page, login footer, sidebar link, and settings hint scrubbed of LexAlloc references; positioned as a standalone product.
+- v0.1.0: Scaffolded full app (frontend, Supabase migration, Edge Function, state-law catalog).
