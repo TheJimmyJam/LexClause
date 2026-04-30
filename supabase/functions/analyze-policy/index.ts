@@ -155,6 +155,42 @@ INVARIANTS (verify before returning):
 - at least one citation from state_rule.citations in methodology_text (when the catalog has any)
 - never fabricate a case — quote citations exactly as they appear in state_rule.citations`
 
+const MATTER_INTAKE_SYSTEM = `You are reading an insurance intake document — typically a First Notice of Loss (FNOL), reservation-of-rights letter, coverage acknowledgment, claim summary, or pleadings. Your job is to pull every fact LexClause needs to seed a coverage matter so a coverage attorney doesn't have to re-key it.
+
+Return ONE JSON object with this exact shape — no prose, no markdown, no fences:
+
+{
+  "document_type": "FNOL"|"reservation_of_rights"|"coverage_acknowledgment"|"complaint"|"claim_summary"|"demand_letter"|"other",
+  "matter_name": string|null,                       // a clean, useful matter title (e.g. "Acme Industrial v. NorthStar Builders — TX warehouse fire")
+  "named_insured": string|null,                     // the insured named in the document
+  "additional_insureds": string[],                  // any additional insureds called out
+  "claim_number": string|null,                      // carrier claim number if shown
+  "loss_type": "environmental"|"construction_defect"|"product_liability"|"asbestos"|"professional"|"cyber"|"auto"|"general_liability"|"property"|"d&o"|"other"|null,
+  "loss_start_date": "YYYY-MM-DD"|null,             // when injury/damage began
+  "loss_end_date": "YYYY-MM-DD"|null,               // when it ended (or same as start for single-event)
+  "damages_exposure": number|null,                  // total alleged or estimated damages in USD; integer
+  "venue_state": "XX"|null,                         // 2-letter postal code where suit is filed / claim is being adjusted
+  "insured_hq_state": "XX"|null,                    // insured's principal place of business state
+  "loss_location_states": string[],                 // states where the harm occurred
+  "carriers_mentioned": [
+    {
+      "carrier": string,
+      "policy_number": string|null,
+      "role": "primary"|"umbrella"|"excess"|"unspecified"|null
+    }
+  ],
+  "description": string                             // 2-4 sentence summary of the matter facts as stated in the document. No speculation beyond what's written.
+}
+
+Rules:
+- Use ONLY information stated or directly inferable from the document. If a field is not in the document, return null (or [] for arrays). Do NOT guess.
+- For matter_name, prefer the format "{Insured} — {short description of loss/venue}". Keep it under 80 characters.
+- For dates, prefer the most specific. If only "2018" is stated, use "2018-01-01" and note the imprecision in description.
+- For damages_exposure, pull a single number representing the alleged or estimated total. If a range is given (e.g. "$500k–$2M"), use the midpoint and note in description.
+- carriers_mentioned: list every carrier the document names, with their policy number if shown.
+- description: factual summary only. No legal conclusions.
+- Output MUST be valid JSON — nothing else.`
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 async function downloadAsBase64(supabase, bucket, storagePath) {
   const { data, error } = await supabase.storage.from(bucket).download(storagePath)
@@ -390,6 +426,23 @@ async function handleExtract(supabase, policyId) {
   return { ok: true, policy_id: policyId, parsed }
 }
 
+// ── Mode: extract_matter ────────────────────────────────────────────────────
+async function handleExtractMatter(supabase, storagePath) {
+  if (!storagePath) throw new Error('storagePath required')
+  const pdfB64 = await downloadAsBase64(supabase, 'lc-matter-docs', storagePath)
+  const claudeResp = await callClaude({
+    system: MATTER_INTAKE_SYSTEM,
+    userContent: [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfB64 } },
+      { type: 'text', text: 'Extract the matter intake data from this PDF. Return only the JSON object — no prose.' },
+    ],
+    max_tokens: 4096,
+  })
+  const text = claudeResp.content?.[0]?.text || ''
+  const parsed = parseJsonFromClaude(text)
+  return { ok: true, parsed, storagePath }
+}
+
 // ── Mode: allocate ──────────────────────────────────────────────────────────
 //
 // Split into two phases so the HTTP handler can return an analysisId
@@ -586,7 +639,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, comparisonStates, wait } = await req.json()
+    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, comparisonStates, storagePath, wait } = await req.json()
 
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -596,6 +649,11 @@ serve(async (req) => {
     if (mode === 'extract_terms') {
       if (!policyId) throw new Error('policyId required')
       const out = await handleExtract(supabase, policyId)
+      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    if (mode === 'extract_matter') {
+      const out = await handleExtractMatter(supabase, storagePath)
       return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
