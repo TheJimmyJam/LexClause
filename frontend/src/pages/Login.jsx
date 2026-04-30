@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff, Scale } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import toast from 'react-hot-toast'
 
@@ -21,11 +21,9 @@ export default function Login() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-6">
-            <div className="w-[72px] h-[72px] rounded-2xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-2xl shadow-brand-600/40">
-              <Scale className="h-9 w-9 text-white" />
-            </div>
+            <img src="/logo-icon.png" alt="LexClause" className="w-[72px] h-[72px] rounded-2xl ring-1 ring-white/10 shadow-2xl shadow-brand-700/40" />
           </div>
-          <h1 className="text-2xl font-bold text-white">Sign in to LexClause</h1>
+          <h1 className="text-2xl font-bold text-white font-serif-brand">Sign in to LexClause</h1>
           <p className="text-slate-400 mt-1 text-sm">Coverage allocation, made defensible.</p>
         </div>
 
