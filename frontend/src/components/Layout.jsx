@@ -72,20 +72,21 @@ export default function Layout() {
         <NavItems />
       </nav>
 
-      <div className="px-3 py-3 border-t border-white/8 space-y-2">
-        <button
-          onClick={toggleDark}
-          className="flex w-full items-center gap-3 px-3 py-2 text-sm text-slate-300 hover:text-white hover:bg-white/8 rounded-lg"
-          title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-        >
-          {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          {dark ? 'Light mode' : 'Dark mode'}
-        </button>
-
+      <div className="px-3 py-3 border-t border-white/8 space-y-1">
         {profile && (
-          <div className="px-3 py-2 text-xs text-slate-400 truncate">
-            {profile.first_name || ''} {profile.last_name || ''}
-            <div className="text-slate-500 truncate">{profile.organization?.name || ''}</div>
+          <div className="flex items-center gap-2 px-3 py-2">
+            <div className="flex-1 min-w-0 text-xs text-slate-400 truncate">
+              {profile.first_name || ''} {profile.last_name || ''}
+              <div className="text-slate-500 truncate">{profile.organization?.name || ''}</div>
+            </div>
+            <button
+              onClick={toggleDark}
+              className="flex-shrink-0 p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-md transition-colors"
+              title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            >
+              {dark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            </button>
           </div>
         )}
 
