@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import {
-  Scale, Shield, ArrowRight, Upload, FileSearch,
+  Shield, ArrowRight, Upload, FileSearch,
   Map, Layers, Gavel, ChevronRight, BookOpen,
   CheckCircle2, Calculator, FileCheck,
 } from 'lucide-react'
@@ -83,17 +83,15 @@ export default function Landing() {
     <div className="min-h-screen bg-slate-950 text-white">
       <nav className="sticky top-0 z-50 flex items-center justify-between px-6 lg:px-16 py-4 bg-slate-950/90 backdrop-blur border-b border-white/5">
         <Link to="/" className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/30">
-            <Scale className="h-5 w-5 text-white" />
-          </div>
+          <img src="/logo-icon.png" alt="LexClause" className="w-11 h-11 rounded-xl ring-1 ring-white/10" />
           <div>
-            <div className="font-bold text-lg leading-none">LexClause</div>
-            <div className="text-slate-400 text-[11px] mt-0.5">Coverage Allocation</div>
+            <div className="font-bold text-lg leading-none font-serif-brand">LexClause</div>
+            <div className="text-slate-400 text-[11px] mt-0.5 tracking-wider">COVERAGE ALLOCATION</div>
           </div>
         </Link>
         <div className="flex items-center gap-3">
           <Link to="/login" className="text-slate-300 hover:text-white text-sm font-medium transition-colors px-3 py-1.5">Log In</Link>
-          <Link to="/register" className="flex items-center gap-1.5 px-4 py-2 bg-brand-500 hover:bg-brand-400 text-white text-sm font-semibold rounded-lg transition-colors">
+          <Link to="/register" className="flex items-center gap-1.5 px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-sm font-semibold rounded-lg transition-colors">
             Sign Up <ChevronRight className="h-3.5 w-3.5" />
           </Link>
         </div>
