@@ -78,7 +78,7 @@ export default function Landing() {
         <div className="relative max-w-4xl mx-auto">
           <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-white/5 border border-white/10 rounded-full text-xs text-slate-300 mb-6">
             <Shield className="h-3.5 w-3.5 text-brand-400" />
-            From the makers of LexAlloc
+            Built for coverage counsel
           </div>
           <h1 className="text-5xl lg:text-7xl font-extrabold leading-tight mb-6 tracking-tight">
             Allocate Coverage<br />
@@ -140,9 +140,9 @@ export default function Landing() {
 
       <section className="px-6 lg:px-16 py-20">
         <div className="max-w-3xl mx-auto text-center bg-gradient-to-br from-brand-600/20 to-cyan-600/10 border border-brand-500/20 rounded-3xl p-12">
-          <h2 className="text-3xl lg:text-4xl font-bold mb-4">Pair it with LexAlloc</h2>
+          <h2 className="text-3xl lg:text-4xl font-bold mb-4">Stop running coverage analyses in spreadsheets.</h2>
           <p className="text-slate-300 mb-8">
-            LexAlloc apportions invoices across parties and policy periods. LexClause decides how the carriers share. Same login. Same org.
+            Upload a policy stack, define the loss, pick the controlling state. LexClause produces a defensible per-carrier allocation with citations — in minutes, not weeks.
           </p>
           <Link to="/register"
             className="inline-flex items-center gap-2 px-7 py-3.5 bg-brand-500 hover:bg-brand-400 text-white font-semibold rounded-xl transition-all shadow-lg shadow-brand-500/25">
@@ -152,7 +152,7 @@ export default function Landing() {
       </section>
 
       <footer className="px-6 lg:px-16 py-8 border-t border-white/5 text-center text-slate-500 text-sm">
-        © {new Date().getFullYear()} LexClause · A sister product to LexAlloc
+        © {new Date().getFullYear()} LexClause · Coverage allocation, made defensible
       </footer>
     </div>
   )
