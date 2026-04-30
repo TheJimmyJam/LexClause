@@ -136,11 +136,17 @@ OUTPUT — ONE JSON object, no prose, no markdown:
   "methodology_text": string             // 2-4 paragraph memo. Trigger choice. Layer structure. Why the controlling state's rule applies. Cite at least one controlling case from the governing state. Note any meaningful endorsement effects (Primary-Non-Contributory, anti-stacking, follows-form, etc.).
 }
 
+CITATION RULES — strict:
+- The state_rule object provided in the user payload contains a "citations" array of vetted, verified case citations for the controlling state. **Use those citations and only those citations** when supporting the rule of decision in methodology_text.
+- Do NOT invent or paraphrase case names, reporter cites, court names, or years from your training data. Coverage law is the kind of legal area where misciting is malpractice.
+- If you need a proposition that is not supported by a citation in state_rule.citations, write it as a general statement of doctrine without a fake citation, OR say "no citation in catalog for this point" rather than invent one.
+- If state_rule.citations is empty or missing, write the methodology in general terms and explicitly note that the catalog has no curated citations for this jurisdiction yet.
+
 INVARIANTS (verify before returning):
 - sum(results[].allocated_amount) + insured_retention === matter.damages_exposure (within $1)
 - each results[].allocated_amount <= results[].applicable_limit
-- at least one citation from the governing state in methodology_text
-- no fabricated cases — if you don't know a citation for the rule, say so instead of inventing one`
+- at least one citation from state_rule.citations in methodology_text (when the catalog has any)
+- never fabricate a case — quote citations exactly as they appear in state_rule.citations`
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 async function downloadAsBase64(supabase, bucket, storagePath) {
