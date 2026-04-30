@@ -3,10 +3,6 @@ import { supabase } from '../lib/supabase.js'
 
 const AuthContext = createContext(null)
 
-/**
- * LexClause reuses LexAlloc's `la_profiles` and `la_organizations` tables.
- * One user, one login, one org membership across both apps.
- */
 export function AuthProvider({ children }) {
   const [user,    setUser]    = useState(null)
   const [profile, setProfile] = useState(null)
@@ -14,8 +10,8 @@ export function AuthProvider({ children }) {
 
   async function fetchProfile(userId) {
     const { data } = await supabase
-      .from('la_profiles')
-      .select('*, la_organizations(*)')
+      .from('pa_profiles')
+      .select('*, organization:pa_organizations(*)')
       .eq('id', userId)
       .single()
     setProfile(data)
