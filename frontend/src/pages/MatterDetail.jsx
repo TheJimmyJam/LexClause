@@ -1,10 +1,10 @@
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Sparkles, Plus } from 'lucide-react'
+import { ArrowLeft, Sparkles, Plus, GitCompareArrows, X } from 'lucide-react'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { runAllocationAnalysis } from '../lib/policyAnalysis.js'
+import { runAllocationAnalysis, runComparison } from '../lib/policyAnalysis.js'
 import { STATE_RULES, candidateJurisdictions } from '../lib/stateLaw.js'
 import toast from 'react-hot-toast'
 
@@ -41,6 +41,7 @@ export default function MatterDetail() {
   })
 
   const [running, setRunning] = useState(false)
+  const [compareOpen, setCompareOpen] = useState(false)
 
   if (!matter) return <div className="p-10 text-center text-slate-500">Loading…</div>
 
@@ -116,11 +117,29 @@ export default function MatterDetail() {
           <h1 className="text-3xl font-bold text-slate-900">{matter.name}</h1>
           <p className="text-slate-600 mt-1">Coverage matter</p>
         </div>
-        <button onClick={handleRunAnalysis} disabled={running} className="btn-primary">
-          <Sparkles className="h-4 w-4" />
-          {running ? 'Running…' : 'Run allocation analysis'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setCompareOpen(true)} disabled={attachedPolicyIds.size === 0} className="btn-secondary">
+            <GitCompareArrows className="h-4 w-4" />
+            Compare jurisdictions
+          </button>
+          <button onClick={handleRunAnalysis} disabled={running} className="btn-primary">
+            <Sparkles className="h-4 w-4" />
+            {running ? 'Running…' : 'Run allocation'}
+          </button>
+        </div>
       </div>
+
+      {compareOpen && (
+        <CompareModal
+          matter={matter}
+          candidates={candidates}
+          attached={attachedPolicies}
+          onClose={() => setCompareOpen(false)}
+          onLaunched={(comparisonGroupId) => {
+            navigate(`/matters/${matterId}/compare/${comparisonGroupId}`)
+          }}
+        />
+      )}
 
       <div className="grid lg:grid-cols-2 gap-6 mb-8">
         <div className="card p-5">
@@ -332,6 +351,123 @@ function StateSelect({ label, value, onChange, hint }) {
       </select>
       {hint && <p className="text-xs text-slate-500 mt-1">{hint}</p>}
     </div>
+  )
+}
+
+function CompareModal({ matter, candidates, attached, onClose, onLaunched }) {
+  // Default selection: candidate jurisdictions if any (capped at 4), else current governing state + 2 more from the candidates pool
+  const seed = candidates.map(c => c.code).slice(0, 4)
+  const [selected, setSelected] = useState(new Set(seed))
+  const [launching, setLaunching] = useState(false)
+
+  const toggle = (code) => {
+    const next = new Set(selected)
+    next.has(code) ? next.delete(code) : next.add(code)
+    setSelected(next)
+  }
+
+  // Pool of states to choose from: union of candidates + all states with seeded rules
+  const seededStates = Object.keys(STATE_RULES).filter(c => STATE_RULES[c])
+  const candidateCodes = new Set(candidates.map(c => c.code))
+  const otherStates = seededStates.filter(s => !candidateCodes.has(s))
+
+  const handleLaunch = async () => {
+    if (selected.size < 2) {
+      toast.error('Pick at least 2 jurisdictions to compare.')
+      return
+    }
+    if (selected.size > 5) {
+      toast.error('5 jurisdictions max — narrows the search and keeps the comparison readable.')
+      return
+    }
+    if (!matter.damages_exposure) {
+      toast.error('Set damages exposure on the matter before comparing.')
+      return
+    }
+    if (attached.length === 0) {
+      toast.error('Attach at least one policy first.')
+      return
+    }
+    setLaunching(true)
+    try {
+      const result = await runComparison(matter.id, [...selected])
+      if (result?.comparisonGroupId) {
+        toast.success(`Comparing ${selected.size} jurisdictions in parallel…`)
+        onLaunched(result.comparisonGroupId)
+      } else {
+        toast.error('Comparison failed to start.')
+      }
+    } catch (e) {
+      toast.error(e.message || 'Comparison failed to start.')
+    } finally {
+      setLaunching(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-2xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-modal" onClick={e => e.stopPropagation()}>
+        <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">Compare jurisdictions</h2>
+            <p className="text-xs text-slate-500 mt-1">Run the same matter under multiple states' allocation rules side-by-side. Pick 2–5.</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="px-6 py-5">
+          {candidates.length > 0 && (
+            <>
+              <div className="text-xs uppercase tracking-wide text-slate-500 font-semibold mb-2">Candidates from this matter's facts</div>
+              <div className="grid sm:grid-cols-2 gap-2 mb-5">
+                {candidates.map(c => (
+                  <StateChoice key={c.code} code={c.code} rule={c.rule} checked={selected.has(c.code)} onToggle={toggle} highlighted />
+                ))}
+              </div>
+            </>
+          )}
+
+          <div className="text-xs uppercase tracking-wide text-slate-500 font-semibold mb-2">Other catalogued states</div>
+          <div className="grid sm:grid-cols-2 gap-2 max-h-72 overflow-y-auto pr-1">
+            {otherStates.map(code => (
+              <StateChoice key={code} code={code} rule={STATE_RULES[code]} checked={selected.has(code)} onToggle={toggle} />
+            ))}
+          </div>
+        </div>
+
+        <div className="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+          <p className="text-xs text-slate-500">{selected.size} selected · {selected.size >= 2 ? 'Ready' : 'Pick at least 2'}</p>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="btn-secondary">Cancel</button>
+            <button onClick={handleLaunch} disabled={launching || selected.size < 2} className="btn-primary">
+              <GitCompareArrows className="h-4 w-4" />
+              {launching ? 'Launching…' : `Compare ${selected.size} jurisdictions`}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function StateChoice({ code, rule, checked, onToggle, highlighted }) {
+  return (
+    <label className={`flex items-start gap-3 p-2.5 rounded-lg cursor-pointer border transition-colors ${
+      checked ? 'bg-brand-50 border-brand-300' : highlighted ? 'bg-amber-50/60 border-amber-200 hover:bg-amber-100/60' : 'bg-white border-slate-200 hover:bg-slate-50'
+    }`}>
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={() => onToggle(code)}
+        className="h-4 w-4 mt-0.5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+      />
+      <div className="flex-1 min-w-0">
+        <div className="text-sm font-medium text-slate-900">{code} · {rule?.name || code}</div>
+        <div className="text-[11px] text-slate-500 truncate">{(rule?.defaultMethod || '').replaceAll('_', ' ')}</div>
+      </div>
+    </label>
   )
 }
 
