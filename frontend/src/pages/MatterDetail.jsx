@@ -15,11 +15,11 @@ export default function MatterDetail() {
   const qc = useQueryClient()
 
   const { data: matter, refetch } = useQuery({
-    queryKey: ['pa_matter', matterId],
+    queryKey: ['lc_matter', matterId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('pa_matters')
-        .select('*, pa_matter_policies(policy_id, role, pa_policies(*)), pa_analyses(*)')
+        .from('lc_matters')
+        .select('*, lc_matter_policies(policy_id, role, lc_policies(*)), lc_analyses(*)')
         .eq('id', matterId)
         .single()
       if (error) throw error
@@ -28,11 +28,11 @@ export default function MatterDetail() {
   })
 
   const { data: orgPolicies = [] } = useQuery({
-    queryKey: ['pa_policies', profile?.org_id, 'for-attach'],
+    queryKey: ['lc_policies', profile?.org_id, 'for-attach'],
     enabled: !!profile?.org_id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('pa_policies')
+        .from('lc_policies')
         .select('id, carrier, policy_number, effective_date, expiration_date')
         .eq('org_id', profile.org_id)
       if (error) throw error
@@ -44,22 +44,22 @@ export default function MatterDetail() {
 
   if (!matter) return <div className="p-10 text-center text-slate-500">Loading…</div>
 
-  const attachedPolicyIds = new Set((matter.pa_matter_policies || []).map(mp => mp.policy_id))
+  const attachedPolicyIds = new Set((matter.lc_matter_policies || []).map(mp => mp.policy_id))
   const candidates = candidateJurisdictions({
-    policyIssuedStates: (matter.pa_matter_policies || []).map(mp => mp.pa_policies?.state_issued).filter(Boolean),
+    policyIssuedStates: (matter.lc_matter_policies || []).map(mp => mp.lc_policies?.state_issued).filter(Boolean),
     matterVenueState:   matter.venue_state,
     insuredHQState:     matter.insured_hq_state,
     lossLocationStates: matter.loss_location_states || [],
   })
 
   const updateMatter = async (patch) => {
-    const { error } = await supabase.from('pa_matters').update(patch).eq('id', matterId)
+    const { error } = await supabase.from('lc_matters').update(patch).eq('id', matterId)
     if (error) { toast.error(error.message); return }
     refetch()
   }
 
   const attachPolicy = async (policyId) => {
-    const { error } = await supabase.from('pa_matter_policies').insert({ matter_id: matterId, policy_id: policyId, role: 'subject' })
+    const { error } = await supabase.from('lc_matter_policies').insert({ matter_id: matterId, policy_id: policyId, role: 'subject' })
     if (error) { toast.error(error.message); return }
     refetch()
   }
@@ -77,7 +77,7 @@ export default function MatterDetail() {
     try {
       const result = await runAllocationAnalysis(matterId)
       toast.success('Analysis complete.')
-      qc.invalidateQueries({ queryKey: ['pa_matter', matterId] })
+      qc.invalidateQueries({ queryKey: ['lc_matter', matterId] })
       if (result?.analysisId) {
         navigate(`/matters/${matterId}/analysis/${result.analysisId}`)
       }
@@ -169,7 +169,7 @@ export default function MatterDetail() {
           <h2 className="font-semibold text-slate-900">Policies on this matter</h2>
           <span className="text-xs text-slate-500">{attachedPolicyIds.size} attached</span>
         </div>
-        {(matter.pa_matter_policies || []).length === 0 ? (
+        {(matter.lc_matter_policies || []).length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">No policies attached. Add some below.</div>
         ) : (
           <table className="w-full text-sm">
@@ -182,17 +182,17 @@ export default function MatterDetail() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {matter.pa_matter_policies.map(mp => (
+              {matter.lc_matter_policies.map(mp => (
                 <tr key={mp.policy_id}>
                   <td className="px-4 py-2.5">
                     <Link to={`/policies/${mp.policy_id}`} className="text-brand-700 hover:text-brand-800 font-medium">
-                      {mp.pa_policies?.carrier || 'Untitled'}
+                      {mp.lc_policies?.carrier || 'Untitled'}
                     </Link>
                   </td>
-                  <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{mp.pa_policies?.policy_number || '—'}</td>
+                  <td className="px-4 py-2.5 text-slate-600 font-mono text-xs">{mp.lc_policies?.policy_number || '—'}</td>
                   <td className="px-4 py-2.5 text-slate-600 text-xs">
-                    {mp.pa_policies?.effective_date && mp.pa_policies?.expiration_date
-                      ? `${mp.pa_policies.effective_date} → ${mp.pa_policies.expiration_date}`
+                    {mp.lc_policies?.effective_date && mp.lc_policies?.expiration_date
+                      ? `${mp.lc_policies.effective_date} → ${mp.lc_policies.expiration_date}`
                       : '—'}
                   </td>
                   <td className="px-4 py-2.5 text-slate-600">{mp.role}</td>
@@ -213,11 +213,11 @@ export default function MatterDetail() {
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
           <h2 className="font-semibold text-slate-900">Analyses</h2>
         </div>
-        {(matter.pa_analyses || []).length === 0 ? (
+        {(matter.lc_analyses || []).length === 0 ? (
           <div className="p-8 text-center text-slate-500 text-sm">No analyses yet. Run one above when you've attached policies and chosen a governing state.</div>
         ) : (
           <ul className="divide-y divide-slate-100">
-            {matter.pa_analyses.map(a => (
+            {matter.lc_analyses.map(a => (
               <li key={a.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50">
                 <Link to={`/matters/${matterId}/analysis/${a.id}`} className="flex-1">
                   <div className="font-medium text-slate-900">{a.governing_state} · {a.allocation_method?.replaceAll('_', ' ')}</div>
