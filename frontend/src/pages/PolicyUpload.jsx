@@ -25,13 +25,13 @@ export default function PolicyUpload() {
           // 1. Upload PDF to storage
           const filePath = `${profile.org_id}/${Date.now()}-${file.name}`
           const { error: uploadErr } = await supabase.storage
-            .from('pa-policies')
+            .from('lc-policies')
             .upload(filePath, file, { contentType: 'application/pdf' })
           if (uploadErr) throw uploadErr
 
-          // 2. Create pa_policies row
+          // 2. Create lc_policies row
           const { data: policy, error: insertErr } = await supabase
-            .from('pa_policies')
+            .from('lc_policies')
             .insert({
               org_id: profile.org_id,
               source_filename: file.name,
