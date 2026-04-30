@@ -12,11 +12,11 @@ export default function Matters() {
   const [name, setName] = useState('')
 
   const { data: matters = [], isLoading, refetch } = useQuery({
-    queryKey: ['pa_matters', profile?.org_id],
+    queryKey: ['lc_matters', profile?.org_id],
     enabled: !!profile?.org_id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('pa_matters')
+        .from('lc_matters')
         .select('id, name, venue_state, governing_state, loss_type, created_at')
         .eq('org_id', profile.org_id)
         .order('created_at', { ascending: false })
@@ -29,7 +29,7 @@ export default function Matters() {
     e.preventDefault()
     if (!name.trim() || !profile?.org_id) return
     const { data, error } = await supabase
-      .from('pa_matters')
+      .from('lc_matters')
       .insert({ org_id: profile.org_id, name: name.trim() })
       .select()
       .single()
