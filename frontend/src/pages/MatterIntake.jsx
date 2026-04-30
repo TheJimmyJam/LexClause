@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useDropzone } from 'react-dropzone'
 import {
   ArrowLeft, Upload, Loader2, FileText, AlertTriangle,
-  CheckCircle2, Sparkles, Building2,
+  CheckCircle2, Sparkles, Building2, Link2, ExternalLink,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
@@ -40,6 +40,8 @@ export default function MatterIntake() {
   const [filename, setFilename] = useState(null)
   const [extracted, setExtracted] = useState(null) // raw Claude parse, kept for raw_intake_extraction
   const [form, setForm]         = useState(null)   // editable matter form
+  const [matches, setMatches]   = useState([])     // [{ mention, policy, confidence }] one per carrier mentioned
+  const [attachIds, setAttachIds] = useState(new Set())  // which matched policy_ids to auto-attach
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     accept: { 'application/pdf': ['.pdf'] },
@@ -79,6 +81,16 @@ export default function MatterIntake() {
           loss_location_states: Array.isArray(p.loss_location_states) ? p.loss_location_states.join(', ') : '',
         })
 
+        // 3b. Match carriers_mentioned against the org's policy library
+        setStatus('Looking for matching policies in your library…')
+        const orgPolicies = await fetchOrgPolicies(profile.org_id)
+        const computed = matchCarriers(p.carriers_mentioned || [], orgPolicies)
+        setMatches(computed)
+        // Pre-check high-confidence matches
+        setAttachIds(new Set(
+          computed.filter(m => m.policy && m.confidence === 'high').map(m => m.policy.id)
+        ))
+
         setPhase('review')
       } catch (e) {
         console.error(e)
@@ -117,7 +129,22 @@ export default function MatterIntake() {
       }
       const { data, error } = await supabase.from('lc_matters').insert(payload).select().single()
       if (error) throw error
-      toast.success('Matter created from document.')
+
+      // Auto-attach the user-confirmed matched policies
+      if (attachIds.size > 0) {
+        const rows = [...attachIds].map(policyId => ({
+          matter_id: data.id, policy_id: policyId, role: 'subject',
+        }))
+        const { error: mpErr } = await supabase.from('lc_matter_policies').insert(rows)
+        if (mpErr) {
+          console.error('attach failed', mpErr)
+          toast.success(`Matter created — but ${attachIds.size} policy attachment${attachIds.size === 1 ? '' : 's'} failed.`)
+        } else {
+          toast.success(`Matter created with ${attachIds.size} polic${attachIds.size === 1 ? 'y' : 'ies'} attached.`)
+        }
+      } else {
+        toast.success('Matter created from document.')
+      }
       navigate(`/matters/${data.id}`)
     } catch (e) {
       toast.error(e.message || 'Failed to create matter.')
@@ -177,10 +204,84 @@ export default function MatterIntake() {
           onBack={() => setPhase('upload')}
           onSave={handleSave}
           busy={busy}
+          matches={matches}
+          attachIds={attachIds}
+          onToggleAttach={(id) => setAttachIds(prev => {
+            const next = new Set(prev)
+            next.has(id) ? next.delete(id) : next.add(id)
+            return next
+          })}
         />
       )}
     </div>
   )
+}
+
+// ── Library matching ───────────────────────────────────────────────────────
+async function fetchOrgPolicies(orgId) {
+  const { data, error } = await supabase
+    .from('lc_policies')
+    .select('id, carrier, policy_number, named_insured, effective_date, expiration_date, policy_form, per_occurrence_limit, state_issued')
+    .eq('org_id', orgId)
+  if (error) { console.error(error); return [] }
+  return data || []
+}
+
+const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, ' ')
+const normPolicyNum = (s) => String(s || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+// Strip company-form suffixes that introduce false negatives ("Inc.", "Co." etc.)
+const stripSuffix = (s) =>
+  norm(s)
+    .replace(/\b(inc|incorporated|llc|llp|ltd|limited|corp|corporation|company|co|insurance|ins|casualty|cas|mutual|mut|fire)\.?\b/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+/**
+ * Match each mentioned carrier to a policy in the org's library.
+ * Returns [{ mention, policy | null, confidence: 'high' | 'medium' | null, reason }]
+ *  - 'high'   = policy_number exact (alpha-numeric only) match
+ *  - 'medium' = carrier name token overlap, no number match
+ *  - null     = no match
+ */
+function matchCarriers(mentions, library) {
+  const result = []
+  for (const m of mentions || []) {
+    if (!m || (!m.carrier && !m.policy_number)) continue
+
+    let policy = null
+    let confidence = null
+    let reason = ''
+
+    // 1. Exact policy_number match (after normalisation)
+    if (m.policy_number) {
+      const target = normPolicyNum(m.policy_number)
+      if (target) {
+        policy = library.find(p => normPolicyNum(p.policy_number) === target) || null
+        if (policy) { confidence = 'high'; reason = `Policy #${m.policy_number} matched exactly` }
+      }
+    }
+
+    // 2. Fall back to carrier-name match when no policy number hit
+    if (!policy && m.carrier) {
+      const mTokens = stripSuffix(m.carrier).split(/\s+/).filter(Boolean)
+      let bestMatch = null, bestScore = 0
+      for (const p of library) {
+        const pTokens = stripSuffix(p.carrier).split(/\s+/).filter(Boolean)
+        if (mTokens.length === 0 || pTokens.length === 0) continue
+        const overlap = mTokens.filter(t => pTokens.includes(t)).length
+        const score = overlap / Math.min(mTokens.length, pTokens.length)
+        if (score > bestScore) { bestScore = score; bestMatch = p }
+      }
+      if (bestMatch && bestScore >= 0.5) {
+        policy = bestMatch
+        confidence = 'medium'
+        reason = `Carrier name ${(bestScore * 100).toFixed(0)}% match`
+      }
+    }
+
+    result.push({ mention: m, policy, confidence, reason })
+  }
+  return result
 }
 
 function Tip({ icon: Icon, text }) {
@@ -192,9 +293,10 @@ function Tip({ icon: Icon, text }) {
   )
 }
 
-function ReviewForm({ form, extracted, filename, update, onBack, onSave, busy }) {
-  const carriers = Array.isArray(extracted?.carriers_mentioned) ? extracted.carriers_mentioned : []
+function ReviewForm({ form, extracted, filename, update, onBack, onSave, busy, matches, attachIds, onToggleAttach }) {
   const docType = (extracted?.document_type || 'document').replaceAll('_', ' ')
+  const matched   = matches.filter(m => m.policy)
+  const unmatched = matches.filter(m => !m.policy)
 
   return (
     <>
@@ -251,25 +353,79 @@ function ReviewForm({ form, extracted, filename, update, onBack, onSave, busy })
         </div>
       </div>
 
-      {/* Carriers mentioned (read-only — they'll be attached after the matter is created) */}
-      {carriers.length > 0 && (
+      {/* Carriers mentioned — auto-matched against the policy library */}
+      {(matched.length > 0 || unmatched.length > 0) && (
         <div className="card p-5 mb-6">
-          <div className="flex items-start gap-3 mb-3">
+          <div className="flex items-start gap-3 mb-4">
             <Building2 className="h-5 w-5 text-brand-700 flex-shrink-0 mt-0.5" />
             <div>
-              <h3 className="font-semibold text-slate-900">Carriers mentioned in the document</h3>
-              <p className="text-xs text-slate-600 mt-0.5">Attach the matching policies after the matter is created. If a policy isn't in your library yet, upload it on the Policies page first.</p>
+              <h3 className="font-semibold text-slate-900">Carriers in this document</h3>
+              <p className="text-xs text-slate-600 mt-0.5">
+                {matched.length > 0
+                  ? `${matched.length} of ${matches.length} matched a policy in your library — they'll attach to the matter automatically.`
+                  : `No policies in your library matched the carriers in this document. Upload the policies first to enable auto-attach.`}
+              </p>
             </div>
           </div>
-          <ul className="divide-y divide-slate-100">
-            {carriers.map((c, i) => (
-              <li key={i} className="py-2.5 flex items-center gap-3 text-sm">
-                <span className="font-medium text-slate-900 flex-1">{c.carrier || '—'}</span>
-                {c.policy_number && <span className="text-slate-600 font-mono text-xs">{c.policy_number}</span>}
-                {c.role && <span className="badge bg-slate-100 text-slate-700 text-[10px]">{c.role}</span>}
-              </li>
-            ))}
-          </ul>
+
+          {matched.length > 0 && (
+            <ul className="divide-y divide-slate-100 mb-2">
+              {matched.map((m, i) => {
+                const checked = attachIds.has(m.policy.id)
+                const isHigh = m.confidence === 'high'
+                return (
+                  <li key={i} className="py-3 flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => onToggleAttach(m.policy.id)}
+                      className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="font-medium text-slate-900 truncate">{m.policy.carrier}</span>
+                        {m.policy.policy_number && (
+                          <span className="text-slate-500 font-mono text-xs">{m.policy.policy_number}</span>
+                        )}
+                        {isHigh
+                          ? <span className="badge bg-emerald-100 text-emerald-800 text-[10px] inline-flex items-center gap-1"><Link2 className="h-2.5 w-2.5" /> Exact match</span>
+                          : <span className="badge bg-amber-100 text-amber-800 text-[10px]">Likely match</span>}
+                      </div>
+                      <div className="text-xs text-slate-500 mt-0.5">
+                        Document said: <span className="text-slate-700">{m.mention.carrier || '—'}</span>
+                        {m.mention.policy_number && <span className="text-slate-500 font-mono"> · {m.mention.policy_number}</span>}
+                        {m.reason && <span className="text-slate-400"> — {m.reason}</span>}
+                      </div>
+                    </div>
+                    <Link
+                      to={`/policies/${m.policy.id}`}
+                      target="_blank"
+                      className="text-xs text-brand-700 hover:text-brand-800 font-medium inline-flex items-center gap-1 whitespace-nowrap"
+                    >
+                      View <ExternalLink className="h-3 w-3" />
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+
+          {unmatched.length > 0 && (
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <div className="text-xs uppercase tracking-wide text-slate-500 font-semibold mb-2">Mentioned but not in your library</div>
+              <ul className="space-y-1.5">
+                {unmatched.map((m, i) => (
+                  <li key={i} className="text-xs text-slate-600 flex items-center justify-between">
+                    <span>
+                      <span className="font-medium text-slate-700">{m.mention.carrier || '—'}</span>
+                      {m.mention.policy_number && <span className="text-slate-500 font-mono"> · {m.mention.policy_number}</span>}
+                    </span>
+                    <Link to="/policies/upload" className="text-slate-500 hover:text-brand-700">Upload PDF →</Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
 
