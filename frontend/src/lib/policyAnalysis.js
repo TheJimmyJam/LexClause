@@ -4,7 +4,7 @@
  * The frontend NEVER holds an Anthropic API key. We invoke an Edge Function
  * (`analyze-policy`) that holds ANTHROPIC_API_KEY in its server env, calls
  * Claude with a structured-output prompt, and writes the parsed result back
- * into pa_policy_terms / pa_analysis_results.
+ * into lc_policy_terms / lc_analysis_results.
  *
  * Frontend role: upload PDFs, kick off analyses, poll/display results.
  */
