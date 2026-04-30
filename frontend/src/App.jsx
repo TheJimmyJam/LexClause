@@ -14,6 +14,7 @@ import PolicyUpload   from './pages/PolicyUpload.jsx'
 import Matters        from './pages/Matters.jsx'
 import MatterDetail   from './pages/MatterDetail.jsx'
 import Analysis       from './pages/Analysis.jsx'
+import Comparison     from './pages/Comparison.jsx'
 import Settings       from './pages/Settings.jsx'
 
 function ProtectedRoute({ children }) {
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/matters"                 element={<Matters />} />
           <Route path="/matters/:matterId"       element={<MatterDetail />} />
           <Route path="/matters/:matterId/analysis/:analysisId" element={<Analysis />} />
+          <Route path="/matters/:matterId/compare/:comparisonGroupId" element={<Comparison />} />
           <Route path="/settings"                element={<Settings />} />
         </Route>
 
