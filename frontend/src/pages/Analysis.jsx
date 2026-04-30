@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Download, AlertTriangle, CheckCircle2, FileText, FileType, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Download, AlertTriangle, CheckCircle2, FileText, FileType, ChevronDown, Loader2, XCircle } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
@@ -21,7 +21,14 @@ export default function Analysis() {
         .single()
       if (error) throw error
       return data
-    }
+    },
+    // Poll while the engine is still working in the background.
+    // Once status flips to 'complete' or 'failed', stop polling.
+    refetchInterval: (q) => {
+      const s = q?.state?.data?.status
+      return s === 'running' || s === 'pending' ? 2000 : false
+    },
+    refetchIntervalInBackground: true,
   })
 
   if (!analysis) return <div className="p-10 text-center text-slate-500">Loading analysis…</div>
@@ -47,19 +54,33 @@ export default function Analysis() {
           <h1 className="text-3xl font-bold text-slate-900">Coverage Allocation</h1>
           <p className="text-slate-600 mt-1">{analysis.lc_matters?.name}</p>
         </div>
-        <ExportMenu
-          analysis={analysis}
-          matter={analysis.lc_matters}
-          results={results}
-          organization={profile?.organization}
-        />
+        {analysis.status === 'complete' && (
+          <ExportMenu
+            analysis={analysis}
+            matter={analysis.lc_matters}
+            results={results}
+            organization={profile?.organization}
+          />
+        )}
       </div>
 
-      <ValidationBanner
-        status={analysis.validation_status}
-        errors={analysis.validation_errors}
-        attempts={analysis.validation_attempts}
-      />
+      {(analysis.status === 'running' || analysis.status === 'pending') && (
+        <RunningCard attempts={analysis.validation_attempts} />
+      )}
+
+      {analysis.status === 'failed' && (
+        <FailedCard error={analysis.error} />
+      )}
+
+      {analysis.status === 'complete' && (
+        <ValidationBanner
+          status={analysis.validation_status}
+          errors={analysis.validation_errors}
+          attempts={analysis.validation_attempts}
+        />
+      )}
+
+      {analysis.status === 'complete' && (<>
 
       <div className="grid sm:grid-cols-3 gap-3 mb-6">
         <Stat label="Governing law"     value={analysis.governing_state} />
@@ -136,6 +157,7 @@ export default function Analysis() {
           {analysis.methodology_text || <span className="text-slate-400 italic">Methodology not yet generated.</span>}
         </pre>
       </div>
+      </>)}
     </div>
   )
 }
@@ -163,6 +185,69 @@ function LayerBadge({ layer }) {
 function fmtMoneyOrDash(n) {
   if (n == null || n === '') return '—'
   return `$${Number(n).toLocaleString()}`
+}
+
+function RunningCard({ attempts }) {
+  return (
+    <div className="card p-8 mb-8 border-brand-200/60 bg-gradient-to-br from-brand-50/50 to-cyan-50/30">
+      <div className="flex items-start gap-4">
+        <Loader2 className="h-6 w-6 text-brand-600 animate-spin flex-shrink-0 mt-1" />
+        <div className="flex-1">
+          <h2 className="font-semibold text-slate-900 mb-1">Running coverage allocation…</h2>
+          <p className="text-sm text-slate-600">
+            Claude is reading the policies, applying the controlling state's rule, and validating the math.
+            This usually takes 20-60 seconds; if validation fails, the engine retries up to three times.
+          </p>
+          {attempts > 0 && (
+            <p className="text-xs text-brand-700 mt-3 font-medium">
+              {attempts === 1 ? 'First attempt completed.' : `On attempt ${attempts}/3.`} Re-running with the validator's corrections.
+            </p>
+          )}
+          <div className="mt-5 space-y-1.5">
+            <ProgressStep label="Build the policy tower"        done />
+            <ProgressStep label="Apply the controlling rule"    done />
+            <ProgressStep label="Generate per-carrier shares"   pending />
+            <ProgressStep label="Validate math against limits"  pending />
+            <ProgressStep label="Draft methodology memo"        pending />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ProgressStep({ label, done, pending }) {
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      {done ? (
+        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+      ) : (
+        <Loader2 className="h-3.5 w-3.5 text-brand-500 animate-spin" />
+      )}
+      <span className={done ? 'text-slate-600' : 'text-slate-700 font-medium'}>{label}</span>
+    </div>
+  )
+}
+
+function FailedCard({ error }) {
+  return (
+    <div className="card p-6 mb-8 border-red-200/80 bg-red-50/40">
+      <div className="flex items-start gap-3">
+        <XCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h2 className="font-semibold text-red-900 mb-1">Analysis failed</h2>
+          <p className="text-sm text-red-800">
+            The engine couldn't produce a valid allocation. You can re-run from the matter page.
+          </p>
+          {error && (
+            <pre className="text-xs text-red-700 mt-3 whitespace-pre-wrap font-mono bg-red-100/50 p-2 rounded">
+              {error}
+            </pre>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 function ExportMenu({ analysis, matter, results, organization }) {
