@@ -44,7 +44,11 @@ export default function MatterDetail() {
 
   if (!matter) return <div className="p-10 text-center text-slate-500">Loading…</div>
 
+  const attachedPolicies = (matter.lc_matter_policies || []).map(mp => mp.lc_policies).filter(Boolean)
   const attachedPolicyIds = new Set((matter.lc_matter_policies || []).map(mp => mp.policy_id))
+  const targetedSet = new Set(matter.targeted_carriers || [])
+  const stateAllowsTarget = !!STATE_RULES[matter.governing_state]?.targetedTenderAllowed
+
   const candidates = candidateJurisdictions({
     policyIssuedStates: (matter.lc_matter_policies || []).map(mp => mp.lc_policies?.state_issued).filter(Boolean),
     matterVenueState:   matter.venue_state,
@@ -57,6 +61,14 @@ export default function MatterDetail() {
     if (error) { toast.error(error.message); return }
     refetch()
   }
+
+  const toggleTargeted = (policyId) => {
+    const next = targetedSet.has(policyId)
+      ? [...targetedSet].filter(id => id !== policyId)
+      : [...targetedSet, policyId]
+    return updateMatter({ targeted_carriers: next })
+  }
+  const clearTargeting = () => updateMatter({ targeted_carriers: [] })
 
   const attachPolicy = async (policyId) => {
     const { error } = await supabase.from('lc_matter_policies').insert({ matter_id: matterId, policy_id: policyId, role: 'subject' })
@@ -168,6 +180,54 @@ export default function MatterDetail() {
           )}
         </div>
       </div>
+
+      {stateAllowsTarget && attachedPolicies.length > 0 && (
+        <div className="card p-5 mb-6 border-amber-200/70 bg-amber-50/30">
+          <div className="flex items-start justify-between mb-3">
+            <div>
+              <div className="text-xs uppercase tracking-wide text-amber-800 font-semibold">Targeted tender</div>
+              <p className="text-sm text-slate-700 mt-1">
+                <strong>{matter.governing_state}</strong> allows the insured to selectively tender to specific carriers.
+                Untargeted carriers will be allocated <strong>$0</strong> and the engine will document why.
+                Leave all unchecked to fall back to {STATE_RULES[matter.governing_state]?.name}'s default rule.
+              </p>
+            </div>
+            {targetedSet.size > 0 && (
+              <button onClick={clearTargeting} className="text-xs text-amber-800 hover:text-amber-900 font-medium underline whitespace-nowrap ml-3">
+                Clear targeting
+              </button>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            {attachedPolicies.map(p => {
+              const checked = targetedSet.has(p.id)
+              return (
+                <label key={p.id} className="flex items-center gap-3 p-2.5 rounded-lg hover:bg-amber-100/60 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleTargeted(p.id)}
+                    className="h-4 w-4 rounded border-amber-400 text-amber-600 focus:ring-amber-500"
+                  />
+                  <div className="flex-1 text-sm">
+                    <span className="font-medium text-slate-900">{p.carrier || 'Untitled carrier'}</span>
+                    <span className="text-slate-500 ml-2 font-mono text-xs">{p.policy_number || '—'}</span>
+                    {p.effective_date && p.expiration_date && (
+                      <span className="text-slate-500 text-xs ml-2">{p.effective_date} → {p.expiration_date}</span>
+                    )}
+                  </div>
+                  {checked && <span className="badge bg-amber-200 text-amber-900">Targeted</span>}
+                </label>
+              )
+            })}
+          </div>
+          {targetedSet.size > 0 && (
+            <p className="text-xs text-amber-800 mt-3">
+              Tendered to <strong>{targetedSet.size}</strong> of {attachedPolicies.length} carriers. The engine will allocate $0 to the remaining {attachedPolicies.length - targetedSet.size}.
+            </p>
+          )}
+        </div>
+      )}
 
       <div className="card mb-6">
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
