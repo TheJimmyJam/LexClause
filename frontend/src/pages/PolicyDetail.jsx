@@ -9,9 +9,9 @@ export default function PolicyDetail() {
   const { policyId } = useParams()
 
   const { data: policy, refetch } = useQuery({
-    queryKey: ['pa_policy', policyId],
+    queryKey: ['lc_policy', policyId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('pa_policies').select('*').eq('id', policyId).single()
+      const { data, error } = await supabase.from('lc_policies').select('*').eq('id', policyId).single()
       if (error) throw error
       return data
     }
@@ -19,7 +19,7 @@ export default function PolicyDetail() {
 
   const handleRetryExtraction = async () => {
     try {
-      await supabase.from('pa_policies').update({ extraction_status: 'extracting' }).eq('id', policyId)
+      await supabase.from('lc_policies').update({ extraction_status: 'extracting' }).eq('id', policyId)
       await extractPolicyTerms(policyId)
       toast.success('Re-extraction queued.')
       refetch()
