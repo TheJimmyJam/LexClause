@@ -7,11 +7,11 @@ export default function Analysis() {
   const { matterId, analysisId } = useParams()
 
   const { data: analysis } = useQuery({
-    queryKey: ['pa_analysis', analysisId],
+    queryKey: ['lc_analysis', analysisId],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('pa_analyses')
-        .select('*, pa_analysis_results(*), pa_matters(name, governing_state, venue_state, loss_type)')
+        .from('lc_analyses')
+        .select('*, lc_analysis_results(*), lc_matters(name, governing_state, venue_state, loss_type)')
         .eq('id', analysisId)
         .single()
       if (error) throw error
@@ -21,7 +21,7 @@ export default function Analysis() {
 
   if (!analysis) return <div className="p-10 text-center text-slate-500">Loading analysis…</div>
 
-  const results = analysis.pa_analysis_results || []
+  const results = analysis.lc_analysis_results || []
   const total = results.reduce((acc, r) => acc + Number(r.allocated_amount || 0), 0)
 
   return (
@@ -33,7 +33,7 @@ export default function Analysis() {
       <div className="flex items-start justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Coverage Allocation</h1>
-          <p className="text-slate-600 mt-1">{analysis.pa_matters?.name}</p>
+          <p className="text-slate-600 mt-1">{analysis.lc_matters?.name}</p>
         </div>
         <button className="btn-secondary"><Download className="h-4 w-4" /> Export memo</button>
       </div>
