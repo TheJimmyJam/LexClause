@@ -69,10 +69,6 @@ export default function Login() {
             Don't have an account? <Link to="/register" className="text-brand-600 hover:text-brand-700 font-medium">Sign up</Link>
           </p>
         </form>
-
-        <p className="text-center text-xs text-slate-500 mt-6">
-          Already a LexAlloc user? Sign in with the same email and password.
-        </p>
       </div>
     </div>
   )
