@@ -42,6 +42,21 @@ The same data lives, in machine-readable form, in `frontend/src/lib/stateLaw.js`
 | MI    | Pro-rata by time | Continuous | Yes | *Gelman Sciences* (1998); *Arco Industries* (1995) |
 | VA    | Pro-rata by time | Manifestation | Yes | *Reisen v. Aetna* (1983); *Morrow v. Harleysville* (2000) |
 
+### Tier 3 — added migration 010
+
+| State | Default method | Trigger | Horizontal exhaustion? | Anchor citations |
+|-------|----------------|---------|------------------------|------------------|
+| NH    | Pro-rata by time | Continuous | Yes | *EnergyNorth v. Continental* (2001) |
+| VT    | Pro-rata by time | Continuous | Yes | *Towns v. Northern Security* (2008) |
+| RI    | Pro-rata by time | Continuous | Yes | *Truk-Away v. Aetna* (1999) |
+| HI    | All-sums | Injury-in-fact | No | *Sentinel v. First Ins. of Hawaii* (1994) |
+| ME    | Pro-rata by time | Continuous | Yes | *Coakley v. Maine Bonding* (1992) |
+| LA    | Pro-rata by time | Continuous | Yes | *Rando v. Anco Insulations* (2009) |
+| TN    | Pro-rata by time | Continuous | Yes | *Standard Fire v. Chester O'Donley* (1998) |
+| SC    | Pro-rata by time | Continuous | Yes | *Crossmann v. Harleysville* (2011); S.C. Code § 38-61-70 |
+| IA    | Pro-rata by time | Injury-in-fact | Yes | *Pottawattamie County v. Federated Rural Elec.* (2000) |
+| KY    | Pro-rata by time | Continuous | Yes | *Aetna v. Commonwealth* (2005) |
+
 ## How to read this table
 
 - **Default method** — what the state applies if the policy is silent or ambiguous. Always pre-empted by enforceable, unambiguous policy language to the contrary.
@@ -71,7 +86,9 @@ The matter screen lets the user enter all candidates; the analyzer runs once per
 
 ## States not yet in the catalog
 
-23 states are seeded above. The remaining ~27 (AL, AK, AZ, AR, DC, HI, ID, IA, KS, KY, LA, ME, MS, MT, NE, NV, NH, NM, ND, OK, RI, SC, SD, TN, UT, VT, WV, WY, et al.) return `UNDETERMINED` from the analyzer. When a matter forces the issue, add the rule to `stateLaw.js`, `lc_state_law_rules`, and this table.
+33 states are seeded above. The remaining 17 + DC (AL, AK, AZ, AR, DC, ID, KS, MS, MT, NE, NV, NM, ND, OK, SD, UT, WV, WY) return `UNDETERMINED` from the analyzer. Most are low-volume coverage jurisdictions where the state supreme court hasn't articulated a controlling allocation rule. When a matter forces the issue, add the rule to `stateLaw.js`, `lc_state_law_rules`, and this table.
+
+The honest reason these aren't seeded yet: I'd rather a memo say "the catalog has no curated citations for this jurisdiction yet" than have the engine fabricate a plausible-looking rule from training data. The two-layer architecture only works if the catalog is trustworthy.
 
 ## Source-of-truth discipline
 
