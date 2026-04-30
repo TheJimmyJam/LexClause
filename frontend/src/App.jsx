@@ -12,6 +12,7 @@ import Policies       from './pages/Policies.jsx'
 import PolicyDetail   from './pages/PolicyDetail.jsx'
 import PolicyUpload   from './pages/PolicyUpload.jsx'
 import Matters        from './pages/Matters.jsx'
+import MatterIntake   from './pages/MatterIntake.jsx'
 import MatterDetail   from './pages/MatterDetail.jsx'
 import Analysis       from './pages/Analysis.jsx'
 import Comparison     from './pages/Comparison.jsx'
@@ -62,6 +63,7 @@ export default function App() {
           <Route path="/policies/upload"         element={<PolicyUpload />} />
           <Route path="/policies/:policyId"      element={<PolicyDetail />} />
           <Route path="/matters"                 element={<Matters />} />
+          <Route path="/matters/intake"          element={<MatterIntake />} />
           <Route path="/matters/:matterId"       element={<MatterDetail />} />
           <Route path="/matters/:matterId/analysis/:analysisId" element={<Analysis />} />
           <Route path="/matters/:matterId/compare/:comparisonGroupId" element={<Comparison />} />
