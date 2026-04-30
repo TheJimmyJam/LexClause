@@ -453,16 +453,19 @@ async function startAllocate(supabase, matterId, opts: any = {}) {
     })),
   })
 
+  const insertRow: any = {
+    org_id:           matter.org_id,
+    matter_id:        matterId,
+    governing_state:  governingState,
+    trigger_theory:   triggerTheory,
+    total_amount:     matter.damages_exposure,
+    status:           'running',
+  }
+  if (opts.comparisonGroupId) insertRow.comparison_group_id = opts.comparisonGroupId
+
   const { data: analysis, error: aErr } = await supabase
     .from('lc_analyses')
-    .insert({
-      org_id:           matter.org_id,
-      matter_id:        matterId,
-      governing_state:  governingState,
-      trigger_theory:   triggerTheory,
-      total_amount:     matter.damages_exposure,
-      status:           'running',
-    })
+    .insert(insertRow)
     .select()
     .single()
   if (aErr) throw aErr
@@ -583,7 +586,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, wait } = await req.json()
+    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, comparisonStates, wait } = await req.json()
 
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -598,6 +601,49 @@ serve(async (req) => {
 
     if (mode === 'allocate') {
       if (!matterId) throw new Error('matterId required')
+
+      // Multi-scenario comparison: kick off N analyses with one shared group id
+      if (Array.isArray(comparisonStates) && comparisonStates.length >= 2) {
+        // @ts-ignore — Deno crypto.randomUUID
+        const comparisonGroupId = crypto.randomUUID()
+        const ctxs = []
+        for (const s of comparisonStates) {
+          try {
+            const ctx = await startAllocate(supabase, matterId, {
+              governingStateOverride: s,
+              triggerTheoryOverride,
+              comparisonGroupId,
+            })
+            ctxs.push(ctx)
+          } catch (e) {
+            console.error('startAllocate failed for', s, e)
+          }
+        }
+        // Schedule all N background runs
+        const allWork = Promise.all(ctxs.map(ctx =>
+          processAllocate(supabase, ctx).catch(async (e) => {
+            console.error('processAllocate failed', ctx.governingState, e)
+            try {
+              await supabase.from('lc_analyses').update({
+                status: 'failed',
+                error: String(e?.message || e).slice(0, 1000),
+              }).eq('id', ctx.analysis.id)
+            } catch {}
+          })
+        ))
+        // @ts-ignore
+        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(allWork)
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          comparisonGroupId,
+          analysisIds: ctxs.map(c => c.analysis.id),
+          status: 'running',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
       const opts = { governingStateOverride, triggerTheoryOverride }
 
       // Sync mode for testing / callers that need the full result inline
