@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import {
   LayoutDashboard, FileText, FolderOpen, Settings, LogOut,
-  Menu, X, Moon, Sun, Scale,
+  Menu, X, Moon, Sun,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -60,12 +60,10 @@ export default function Layout() {
     <>
       <div className="px-4 py-5 border-b border-white/8">
         <Link to="/dashboard" className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 flex items-center justify-center shadow-lg shadow-brand-600/20">
-            <Scale className="h-5 w-5 text-white" />
-          </div>
+          <img src="/logo-icon.png" alt="LexClause" className="w-10 h-10 rounded-xl ring-1 ring-white/10" />
           <div>
-            <div className="text-white font-bold text-lg leading-none">LexClause</div>
-            <div className="text-slate-400 text-[11px] mt-1">Coverage analysis</div>
+            <div className="text-white font-bold text-lg leading-none font-serif-brand">LexClause</div>
+            <div className="text-slate-400 text-[11px] mt-1 tracking-wide">Coverage analysis</div>
           </div>
         </Link>
       </div>
