@@ -2,9 +2,9 @@
 //
 // LexClause Edge Function — handles two modes:
 //   1. mode = 'extract_terms' — Claude reads a stored policy PDF and writes
-//      structured fields back to pa_policies (+ endorsements/exclusions).
+//      structured fields back to lc_policies (+ endorsements/exclusions).
 //   2. mode = 'allocate'      — Combines policies, the matter, and state-law
-//      rules into an allocation result; writes pa_analyses + pa_analysis_results.
+//      rules into an allocation result; writes lc_analyses + lc_analysis_results.
 //
 // Required Edge Function secrets:
 //   ANTHROPIC_API_KEY     — Claude API key
@@ -110,7 +110,7 @@ Rules:
 // ---------- Mode handlers -----------------------------------------------------
 
 async function handleExtract(supabase, policyId) {
-  const { data: policy, error: pErr } = await supabase.from('pa_policies').select('*').eq('id', policyId).single()
+  const { data: policy, error: pErr } = await supabase.from('lc_policies').select('*').eq('id', policyId).single()
   if (pErr || !policy) throw new Error('Policy not found')
 
   // Download the PDF text. (For v1 we assume the upstream uploader provides
@@ -119,7 +119,7 @@ async function handleExtract(supabase, policyId) {
   // TODO: wire real PDF ingestion. For now, error if source_text is empty so
   // the pipeline surfaces the gap.
   if (!policy.source_text) {
-    await supabase.from('pa_policies').update({
+    await supabase.from('lc_policies').update({
       extraction_status: 'failed',
       extraction_error:  'No source_text on record. PDF text extraction not yet wired up.',
     }).eq('id', policyId)
@@ -163,17 +163,17 @@ async function handleExtract(supabase, policyId) {
     extracted_at:      new Date().toISOString(),
     raw_extraction:    parsed,
   }
-  await supabase.from('pa_policies').update(update).eq('id', policyId)
+  await supabase.from('lc_policies').update(update).eq('id', policyId)
 
   // Replace endorsements + exclusions
-  await supabase.from('pa_policy_endorsements').delete().eq('policy_id', policyId)
-  await supabase.from('pa_policy_exclusions').delete().eq('policy_id', policyId)
+  await supabase.from('lc_policy_endorsements').delete().eq('policy_id', policyId)
+  await supabase.from('lc_policy_exclusions').delete().eq('policy_id', policyId)
   if (Array.isArray(parsed.endorsements) && parsed.endorsements.length) {
-    await supabase.from('pa_policy_endorsements')
+    await supabase.from('lc_policy_endorsements')
       .insert(parsed.endorsements.map((e) => ({ ...e, policy_id: policyId })))
   }
   if (Array.isArray(parsed.exclusions) && parsed.exclusions.length) {
-    await supabase.from('pa_policy_exclusions')
+    await supabase.from('lc_policy_exclusions')
       .insert(parsed.exclusions.map((e) => ({ ...e, policy_id: policyId })))
   }
 
@@ -182,19 +182,19 @@ async function handleExtract(supabase, policyId) {
 
 async function handleAllocate(supabase, matterId, opts = {}) {
   const { data: matter } = await supabase
-    .from('pa_matters')
-    .select('*, pa_matter_policies(policy_id, role, pa_policies(*))')
+    .from('lc_matters')
+    .select('*, lc_matter_policies(policy_id, role, lc_policies(*))')
     .eq('id', matterId)
     .single()
   if (!matter) throw new Error('Matter not found')
 
-  const policies = (matter.pa_matter_policies || []).map((mp) => mp.pa_policies).filter(Boolean)
+  const policies = (matter.lc_matter_policies || []).map((mp) => mp.lc_policies).filter(Boolean)
   const governingState = opts.governingStateOverride || matter.governing_state
   const triggerTheory  = opts.triggerTheoryOverride  || matter.trigger_theory
   if (!governingState) throw new Error('Matter has no governing_state')
   if (!policies.length) throw new Error('Matter has no policies attached')
 
-  const { data: rule } = await supabase.from('pa_state_law_rules').select('*').eq('state_code', governingState).single()
+  const { data: rule } = await supabase.from('lc_state_law_rules').select('*').eq('state_code', governingState).single()
 
   const userMessage = JSON.stringify({
     matter: {
@@ -228,7 +228,7 @@ async function handleAllocate(supabase, matterId, opts = {}) {
 
   // Create the analysis row up front so we have an id to return / write to
   const { data: analysis, error: aErr } = await supabase
-    .from('pa_analyses')
+    .from('lc_analyses')
     .insert({
       org_id:           matter.org_id,
       matter_id:        matterId,
@@ -250,7 +250,7 @@ async function handleAllocate(supabase, matterId, opts = {}) {
     const text = r.content?.[0]?.text || ''
     const parsed = JSON.parse(text)
 
-    await supabase.from('pa_analyses').update({
+    await supabase.from('lc_analyses').update({
       allocation_method: parsed.allocation_method,
       trigger_theory:    parsed.trigger_theory || triggerTheory,
       methodology_text:  parsed.methodology_text,
@@ -259,7 +259,7 @@ async function handleAllocate(supabase, matterId, opts = {}) {
     }).eq('id', analysis.id)
 
     if (Array.isArray(parsed.results) && parsed.results.length) {
-      await supabase.from('pa_analysis_results').insert(
+      await supabase.from('lc_analysis_results').insert(
         parsed.results.map((row, i) => ({
           analysis_id:         analysis.id,
           policy_id:           row.policy_id,
@@ -278,7 +278,7 @@ async function handleAllocate(supabase, matterId, opts = {}) {
 
     return { ok: true, analysisId: analysis.id }
   } catch (e) {
-    await supabase.from('pa_analyses').update({ status: 'failed', error: String(e) }).eq('id', analysis.id)
+    await supabase.from('lc_analyses').update({ status: 'failed', error: String(e) }).eq('id', analysis.id)
     throw e
   }
 }
