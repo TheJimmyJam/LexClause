@@ -1,6 +1,6 @@
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Download } from 'lucide-react'
+import { ArrowLeft, Download, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 
 export default function Analysis() {
@@ -44,6 +44,12 @@ export default function Analysis() {
         </div>
         <button className="btn-secondary"><Download className="h-4 w-4" /> Export memo</button>
       </div>
+
+      <ValidationBanner
+        status={analysis.validation_status}
+        errors={analysis.validation_errors}
+        attempts={analysis.validation_attempts}
+      />
 
       <div className="grid sm:grid-cols-3 gap-3 mb-6">
         <Stat label="Governing law"     value={analysis.governing_state} />
@@ -147,4 +153,35 @@ function LayerBadge({ layer }) {
 function fmtMoneyOrDash(n) {
   if (n == null || n === '') return '—'
   return `$${Number(n).toLocaleString()}`
+}
+
+function ValidationBanner({ status, errors, attempts }) {
+  if (!status || status === 'not_run') return null
+  const errs = Array.isArray(errors) ? errors : []
+  if (status === 'valid') {
+    return (
+      <div className="flex items-start gap-3 p-3 mb-4 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm">
+        <CheckCircle2 className="h-4 w-4 mt-0.5 flex-shrink-0 text-emerald-600" />
+        <div>
+          <span className="font-medium">Reconciled.</span>{' '}
+          Per-carrier amounts sum to the damages exposure and no allocation exceeds policy limits.
+          {attempts > 1 && <span className="text-emerald-700/80"> Reached after {attempts} attempts (auto-corrected).</span>}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className="flex items-start gap-3 p-3 mb-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+      <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0 text-amber-600" />
+      <div className="flex-1">
+        <span className="font-semibold">Needs review.</span>{' '}
+        Allocation didn't reconcile after {attempts || 1} attempt{(attempts || 1) === 1 ? '' : 's'}. Treat the numbers as a draft and verify before relying on them.
+        {errs.length > 0 && (
+          <ul className="mt-2 space-y-1 list-disc list-inside text-amber-800">
+            {errs.map((e, i) => <li key={i}>{e.message}</li>)}
+          </ul>
+        )}
+      </div>
+    </div>
+  )
 }
