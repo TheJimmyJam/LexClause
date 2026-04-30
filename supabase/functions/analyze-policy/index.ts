@@ -99,6 +99,13 @@ Treat insurance as a TOWER, not a flat pool. Apply this method, in order:
    d. After umbrella, each EXCESS layer attaches sequentially.
    e. Stop once damages_exposure is fully allocated.
 
+5b. TARGETED-TENDER OVERRIDE — read this BEFORE step 6:
+   If matter.targeted_carriers is a non-empty array, the insured has exercised selective tender. Under IL (John Burns; Kajima) and other targeted-tender jurisdictions, this is a HARD CONSTRAINT:
+   - Only carriers in matter.targeted_carriers contribute. Their share among themselves is equal (or per the controlling rule).
+   - Every carrier NOT in matter.targeted_carriers has allocated_amount = 0 and share_pct = 0. They get a row in results[] with rationale = "Not tendered to under [State]'s targeted-tender rule (insured did not include this carrier in the tender)."
+   - Set allocation_method = "targeted_tender" regardless of the state default if a target is specified and the state allows it.
+   - If the controlling state does NOT allow targeted tender (e.g. NY, NJ, CA), note that the targeting has no legal effect and apply the state default — but flag this in methodology_text as a likely insured strategy error.
+
 6. LONG-TAIL with multi-year triggers:
    - States like NJ (Owens-Illinois), NY (Consol Edison), MA (Boston Gas), PA, FL: pro-rata-by-time-on-risk first, allocating exposure across triggered years; then within each year apply step 5
    - States like CA (Montrose II), OH (Goodyear), WA (B&L Trucking): all-sums — insured may pick any one triggered policy and demand full payment up to limits, with rights of contribution; do NOT split across years unless asked
@@ -199,6 +206,30 @@ function validateAllocation(parsed, matter, policies) {
   const exposure = Number(matter.damages_exposure || 0)
   const insuredRetention = Number(parsed.insured_retention || 0)
   const results = Array.isArray(parsed.results) ? parsed.results : []
+  const targetedIds = new Set(Array.isArray(matter.targeted_carriers) ? matter.targeted_carriers : [])
+
+  // 0. Targeted-tender enforcement (deterministic — not LLM judgment)
+  if (targetedIds.size > 0) {
+    const policiesByKey = new Map(
+      policies.map(p => [`${(p.carrier || '').trim()}|${(p.policy_number || '').trim()}`, p])
+    )
+    for (const row of results) {
+      const realPolicy =
+        (row.policy_id && policies.find(p => p.id === row.policy_id)) ||
+        policiesByKey.get(`${(row.carrier || '').trim()}|${(row.policy_number || '').trim()}`) ||
+        null
+      const isTargeted = realPolicy ? targetedIds.has(realPolicy.id) : false
+      const allocated  = Number(row.allocated_amount || 0)
+      if (!isTargeted && allocated > 1) {
+        errors.push({
+          type: 'targeted_tender_violation',
+          carrier: row.carrier,
+          policy_number: row.policy_number,
+          message: `${row.carrier} (${row.policy_number}) was NOT tendered to. Under the targeted-tender rule of the controlling state, allocated_amount must be $0 (got $${allocated.toLocaleString()}). Reallocate this share to the targeted carriers, or to insured_retention if no targeted carrier has remaining capacity.`,
+        })
+      }
+    }
+  }
 
   // 1. Sum check
   const totalAllocated = results.reduce((s, r) => s + Number(r.allocated_amount || 0), 0)
@@ -382,17 +413,26 @@ async function startAllocate(supabase, matterId, opts: any = {}) {
 
   const { data: rule } = await supabase.from('lc_state_law_rules').select('*').eq('state_code', governingState).maybeSingle()
 
+  // Resolve targeted_carriers (uuid[]) to a {policy_id, carrier, policy_number}[]
+  // so Claude can reason about it without us trusting it to look up by UUID.
+  const targetedIds = Array.isArray(matter.targeted_carriers) ? matter.targeted_carriers : []
+  const targetedDetails = targetedIds
+    .map(id => policies.find(p => p.id === id))
+    .filter(Boolean)
+    .map(p => ({ policy_id: p.id, carrier: p.carrier, policy_number: p.policy_number }))
+
   const userPayload = JSON.stringify({
     matter: {
-      name:             matter.name,
-      description:      matter.description ?? null,
-      loss_type:        matter.loss_type,
-      loss_start_date:  matter.loss_start_date,
-      loss_end_date:    matter.loss_end_date,
-      damages_exposure: matter.damages_exposure,
-      venue_state:      matter.venue_state,
-      governing_state:  governingState,
-      trigger_theory:   triggerTheory,
+      name:               matter.name,
+      description:        matter.description ?? null,
+      loss_type:          matter.loss_type,
+      loss_start_date:    matter.loss_start_date,
+      loss_end_date:      matter.loss_end_date,
+      damages_exposure:   matter.damages_exposure,
+      venue_state:        matter.venue_state,
+      governing_state:    governingState,
+      trigger_theory:     triggerTheory,
+      targeted_carriers:  targetedDetails,  // [] = no targeted tender; non-empty = these are the only contributing carriers
     },
     state_rule: rule || null,
     policies: policies.map((p) => ({
