@@ -30,7 +30,7 @@ LexClause/
 │   ├── package.json
 │   └── ...
 ├── supabase/
-│   ├── migrations/      ← pa_ tables, RLS, signup trigger, state-law seed
+│   ├── migrations/      ← lc_ tables, RLS, signup trigger, state-law seed
 │   └── functions/       ← analyze-policy edge function
 ├── docs/                ← ANALYSIS_SPEC.md, STATE_LAW_REFERENCE.md
 ├── netlify.toml         ← base = "frontend"
