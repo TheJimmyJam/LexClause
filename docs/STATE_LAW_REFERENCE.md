@@ -34,6 +34,14 @@ The same data lives, in machine-readable form, in `frontend/src/lib/stateLaw.js`
 | GA    | Pro-rata by time | Continuous | Yes | *Continental Cas. v. H.S.I. Fin.* (1996); *HDI-Gerling v. Morrison Homes* (2012) |
 | OR    | Pro-rata by time | Continuous | Yes | ORS 465.480; *Lamb-Weston v. Or. Auto. Ins.* (1959) |
 
+### Tier 2 round 2 — added migration 007
+
+| State | Default method | Trigger | Horizontal exhaustion? | Anchor citations |
+|-------|----------------|---------|------------------------|------------------|
+| MD    | Pro-rata by time | Continuous | Yes | *Lloyd E. Mitchell* (1991); *Mayor of Baltimore v. Utica Mut.* (2002) |
+| MI    | Pro-rata by time | Continuous | Yes | *Gelman Sciences* (1998); *Arco Industries* (1995) |
+| VA    | Pro-rata by time | Manifestation | Yes | *Reisen v. Aetna* (1983); *Morrow v. Harleysville* (2000) |
+
 ## How to read this table
 
 - **Default method** — what the state applies if the policy is silent or ambiguous. Always pre-empted by enforceable, unambiguous policy language to the contrary.
@@ -63,9 +71,7 @@ The matter screen lets the user enter all candidates; the analyzer runs once per
 
 ## States not yet in the catalog
 
-20 states are seeded above. The remaining ~30 (AL, AK, AZ, AR, DC, HI, ID, IA, KS, KY, LA, ME, MD, MI, MS, MT, NE, NV, NH, NM, ND, OK, RI, SC, SD, TN, UT, VT, VA, WV, WY, et al.) return `UNDETERMINED` from the analyzer. When a matter forces the issue, add the rule to `stateLaw.js`, `lc_state_law_rules`, and this table.
-
-Michigan, Virginia, and Maryland are notable omissions — they have well-established rules but the law has shifted enough that current authority should be verified before seeding (e.g., MI's path through *Arco Industries* and its progeny, VA's narrow manifestation-trigger rule, MD's pro-rata-by-time line). Treat them as next in the queue.
+23 states are seeded above. The remaining ~27 (AL, AK, AZ, AR, DC, HI, ID, IA, KS, KY, LA, ME, MS, MT, NE, NV, NH, NM, ND, OK, RI, SC, SD, TN, UT, VT, WV, WY, et al.) return `UNDETERMINED` from the analyzer. When a matter forces the issue, add the rule to `stateLaw.js`, `lc_state_law_rules`, and this table.
 
 ## Source-of-truth discipline
 
