@@ -313,6 +313,119 @@ export const STATE_RULES = {
     horizontalExhaustion: true,
     targetedTenderAllowed: false,
   },
+
+  // ── TIER 3 — added migration 010 ──────────────────────────────────────────
+  NH: {
+    name: 'New Hampshire',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Continuous trigger and pro-rata-by-time-on-risk for long-tail under EnergyNorth.',
+    citations: [
+      'EnergyNorth Natural Gas, Inc. v. Continental Ins. Co., 146 N.H. 156 (2001)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  VT: {
+    name: 'Vermont',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time-on-risk for long-tail under Towns v. Northern Security.',
+    citations: [
+      'Towns v. Northern Sec. Ins. Co., 184 Vt. 322 (2008)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  RI: {
+    name: 'Rhode Island',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time-on-risk under Truk-Away.',
+    citations: [
+      'Truk-Away of R.I., Inc. v. Aetna Cas. & Sur. Co., 723 A.2d 309 (R.I. 1999)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  HI: {
+    name: 'Hawaii',
+    defaultMethod: ALLOCATION_METHOD.ALL_SUMS,
+    trigger: TRIGGER_THEORY.INJURY_IN_FACT,
+    notes: 'Joint-and-several / all-sums approach under Sentinel; insured may target a triggered carrier.',
+    citations: [
+      'Sentinel Ins. Co. v. First Ins. Co. of Hawaii, 76 Haw. 277 (1994)',
+    ],
+    horizontalExhaustion: false,
+    targetedTenderAllowed: false,
+  },
+  ME: {
+    name: 'Maine',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Continuous trigger for progressive damage; pro-rata across triggered periods (Coakley).',
+    citations: [
+      'Coakley v. Maine Bonding & Cas. Co., 618 A.2d 777 (Me. 1992)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  LA: {
+    name: 'Louisiana',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Civil-law jurisdiction. Pro-rata-by-time on continuous-injury asbestos / long-tail under Rando.',
+    citations: [
+      'Rando v. Anco Insulations Inc., 2008-1163 (La. 5/22/09), 16 So. 3d 1065',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  TN: {
+    name: 'Tennessee',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time-on-risk for long-tail damage under Standard Fire / Chester O\'Donley line.',
+    citations: [
+      "Standard Fire Ins. Co. v. Chester O'Donley & Assocs., 972 S.W.2d 1 (Tenn. Ct. App. 1998)",
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  SC: {
+    name: 'South Carolina',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Modified ratable / time-on-risk allocation under Crossmann; statute (S.C. Code § 38-61-70) codifies time-on-risk for progressive losses.',
+    citations: [
+      'Crossmann Communities of N.C., Inc. v. Harleysville Mut. Ins. Co., 395 S.C. 40 (2011)',
+      'S.C. Code Ann. § 38-61-70 (time-on-risk allocation for progressive damage)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  IA: {
+    name: 'Iowa',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.INJURY_IN_FACT,
+    notes: 'Pro-rata-by-time-on-risk on injury-in-fact trigger for long-tail.',
+    citations: [
+      'Pottawattamie County v. Federated Rural Elec. Ins. Co., 612 N.W.2d 783 (Iowa 2000)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
+  KY: {
+    name: 'Kentucky',
+    defaultMethod: ALLOCATION_METHOD.PRO_RATA_TIME_ON_RISK,
+    trigger: TRIGGER_THEORY.CONTINUOUS,
+    notes: 'Pro-rata-by-time-on-risk for long-tail damage under Aetna v. Commonwealth.',
+    citations: [
+      'Aetna Cas. & Sur. Co. v. Commonwealth, 179 S.W.3d 830 (Ky. 2005)',
+    ],
+    horizontalExhaustion: true,
+    targetedTenderAllowed: false,
+  },
   // ── Stub the rest with UNDETERMINED so the analyzer at least labels the gap ──
 }
 
