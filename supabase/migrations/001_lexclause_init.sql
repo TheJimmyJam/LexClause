@@ -1,25 +1,92 @@
 -- ============================================================================
 -- LexClause — initial schema (migration 001)
 --
--- LexClause shares the LexAlloc Supabase project. It reuses la_profiles and
--- la_organizations for users + orgs. LexClause-owned tables are prefixed pa_
--- and are RLS-gated by the same org_id pattern LexAlloc uses.
+-- Standalone schema. LexClause owns its own organizations, profiles, policies,
+-- matters, analyses, and state-law catalog. Every app table is gated by
+-- pa_user_org() which returns the caller's org_id from pa_profiles.
 --
 -- Run this in the Supabase SQL editor. Idempotent where reasonable.
 -- ============================================================================
 
--- ── Helper: pa_user_org() returns the caller's org_id from la_profiles ──
+-- ── Required extension ──
+create extension if not exists "pgcrypto";  -- for gen_random_uuid()
+
+-- ============================================================================
+-- pa_organizations — top-level tenant
+-- ============================================================================
+create table if not exists pa_organizations (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
+);
+
+-- ============================================================================
+-- pa_profiles — one row per user, links auth.users to an organization
+-- ============================================================================
+create table if not exists pa_profiles (
+  id           uuid primary key references auth.users(id) on delete cascade,
+  org_id       uuid references pa_organizations(id) on delete cascade,
+  email        text,
+  first_name   text,
+  last_name    text,
+  role         text not null default 'member' check (role in ('admin','member','viewer')),
+  created_at   timestamptz not null default now(),
+  updated_at   timestamptz not null default now()
+);
+create index if not exists pa_profiles_org_idx on pa_profiles(org_id);
+
+-- ── Helper: pa_user_org() returns the caller's org_id from pa_profiles ──
 create or replace function pa_user_org() returns uuid
 language sql stable security definer set search_path = public as $$
-  select org_id from la_profiles where id = auth.uid()
+  select org_id from pa_profiles where id = auth.uid()
 $$;
+
+-- ── Auth signup trigger ────────────────────────────────────────────────────
+-- When a new auth.users row is created, auto-create the user's organization
+-- (named from raw_user_meta_data.org_name, falling back to the email's local
+-- part) and then a pa_profiles row pointing at it.
+create or replace function public.handle_new_lexclause_user()
+returns trigger language plpgsql security definer set search_path = public as $$
+declare
+  new_org_id uuid;
+  org_label  text;
+  fname      text;
+  lname      text;
+begin
+  org_label := coalesce(
+    nullif(new.raw_user_meta_data->>'org_name', ''),
+    split_part(new.email, '@', 1)
+  );
+  fname := nullif(new.raw_user_meta_data->>'first_name', '');
+  lname := nullif(new.raw_user_meta_data->>'last_name',  '');
+
+  insert into pa_organizations (name) values (org_label)
+  returning id into new_org_id;
+
+  insert into pa_profiles (id, org_id, email, first_name, last_name, role)
+  values (new.id, new_org_id, new.email, fname, lname, 'admin')
+  on conflict (id) do update
+    set email      = excluded.email,
+        first_name = coalesce(excluded.first_name, pa_profiles.first_name),
+        last_name  = coalesce(excluded.last_name,  pa_profiles.last_name),
+        org_id     = coalesce(pa_profiles.org_id, excluded.org_id);
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created_lexclause on auth.users;
+create trigger on_auth_user_created_lexclause
+  after insert on auth.users
+  for each row execute function public.handle_new_lexclause_user();
 
 -- ============================================================================
 -- pa_policies — the policy library
 -- ============================================================================
 create table if not exists pa_policies (
   id                          uuid primary key default gen_random_uuid(),
-  org_id                      uuid not null references la_organizations(id) on delete cascade,
+  org_id                      uuid not null references pa_organizations(id) on delete cascade,
   created_by                  uuid references auth.users(id),
   created_at                  timestamptz not null default now(),
   updated_at                  timestamptz not null default now(),
@@ -106,7 +173,7 @@ create index if not exists pa_policy_exclusions_policy_idx on pa_policy_exclusio
 -- ============================================================================
 create table if not exists pa_matters (
   id                     uuid primary key default gen_random_uuid(),
-  org_id                 uuid not null references la_organizations(id) on delete cascade,
+  org_id                 uuid not null references pa_organizations(id) on delete cascade,
   created_by             uuid references auth.users(id),
   created_at             timestamptz not null default now(),
   updated_at             timestamptz not null default now(),
@@ -126,10 +193,7 @@ create table if not exists pa_matters (
   governing_state        text,                   -- chosen controlling law
 
   -- Trigger override
-  trigger_theory         text,                   -- exposure | manifestation | continuous_trigger | injury_in_fact | actual_injury
-
-  -- Optional cross-link to a LexAlloc matter
-  lexalloc_matter_id     uuid                     -- references la_matters(id) — soft reference, no FK to keep modules independent
+  trigger_theory         text                    -- exposure | manifestation | continuous_trigger | injury_in_fact | actual_injury
 );
 create index if not exists pa_matters_org_idx on pa_matters(org_id);
 
@@ -150,7 +214,7 @@ create index if not exists pa_matter_policies_policy_idx on pa_matter_policies(p
 -- ============================================================================
 create table if not exists pa_analyses (
   id                  uuid primary key default gen_random_uuid(),
-  org_id              uuid not null references la_organizations(id) on delete cascade,
+  org_id              uuid not null references pa_organizations(id) on delete cascade,
   matter_id           uuid not null references pa_matters(id) on delete cascade,
   created_by          uuid references auth.users(id),
   created_at          timestamptz not null default now(),
@@ -221,20 +285,28 @@ insert into pa_state_law_rules (state_code, name, default_method, default_trigge
 on conflict (state_code) do nothing;
 
 -- ============================================================================
--- updated_at trigger helper (reuse if already defined elsewhere)
+-- updated_at trigger helper
 -- ============================================================================
 create or replace function pa_set_updated_at() returns trigger language plpgsql as $$
 begin new.updated_at := now(); return new; end $$;
 
+drop trigger if exists pa_orgs_set_updated     on pa_organizations;
+create trigger pa_orgs_set_updated     before update on pa_organizations for each row execute function pa_set_updated_at();
+
+drop trigger if exists pa_profiles_set_updated on pa_profiles;
+create trigger pa_profiles_set_updated before update on pa_profiles for each row execute function pa_set_updated_at();
+
 drop trigger if exists pa_policies_set_updated on pa_policies;
 create trigger pa_policies_set_updated before update on pa_policies for each row execute function pa_set_updated_at();
 
-drop trigger if exists pa_matters_set_updated on pa_matters;
-create trigger pa_matters_set_updated before update on pa_matters for each row execute function pa_set_updated_at();
+drop trigger if exists pa_matters_set_updated  on pa_matters;
+create trigger pa_matters_set_updated  before update on pa_matters  for each row execute function pa_set_updated_at();
 
 -- ============================================================================
--- RLS — gate everything by the caller's la_profiles.org_id
+-- RLS — gate everything by the caller's pa_profiles.org_id
 -- ============================================================================
+alter table pa_organizations         enable row level security;
+alter table pa_profiles              enable row level security;
 alter table pa_policies              enable row level security;
 alter table pa_policy_endorsements   enable row level security;
 alter table pa_policy_exclusions     enable row level security;
@@ -243,6 +315,23 @@ alter table pa_matter_policies       enable row level security;
 alter table pa_analyses              enable row level security;
 alter table pa_analysis_results      enable row level security;
 alter table pa_state_law_rules       enable row level security;
+
+-- pa_organizations — caller can only read/update their own org
+drop policy if exists pa_orgs_select on pa_organizations;
+drop policy if exists pa_orgs_update on pa_organizations;
+create policy pa_orgs_select on pa_organizations for select using (id = pa_user_org());
+create policy pa_orgs_update on pa_organizations for update
+  using (id = pa_user_org())
+  with check (id = pa_user_org());
+
+-- pa_profiles — caller can read/update their own profile + others in same org (read-only)
+drop policy if exists pa_profiles_select  on pa_profiles;
+drop policy if exists pa_profiles_self    on pa_profiles;
+create policy pa_profiles_select on pa_profiles for select
+  using (id = auth.uid() or org_id = pa_user_org());
+create policy pa_profiles_self on pa_profiles for update
+  using (id = auth.uid())
+  with check (id = auth.uid());
 
 -- pa_policies
 drop policy if exists pa_policies_select on pa_policies;
@@ -309,7 +398,7 @@ drop policy if exists pa_state_rules_select on pa_state_law_rules;
 create policy pa_state_rules_select on pa_state_law_rules for select using (true);
 
 -- ============================================================================
--- Storage bucket for policy PDFs (run once; safe to skip if it already exists)
+-- Storage bucket for policy PDFs
 -- ============================================================================
 insert into storage.buckets (id, name, public)
 values ('pa-policies', 'pa-policies', false)
