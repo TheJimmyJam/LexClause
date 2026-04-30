@@ -23,9 +23,8 @@ export default function Register() {
     })
     if (error) { toast.error(error.message); return }
 
-    // The la_profiles row + la_organizations are created server-side by the
-    // existing handle_new_user() trigger from LexAlloc — same trigger, same
-    // org membership, no duplication.
+    // The pa_organizations + pa_profiles rows are created server-side by the
+    // handle_new_lexclause_user() trigger on auth.users (see migration 001).
     toast.success('Account created. Check your email to confirm.')
     navigate('/login')
   }
