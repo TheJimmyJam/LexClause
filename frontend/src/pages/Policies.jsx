@@ -10,11 +10,11 @@ export default function Policies() {
   const [search, setSearch] = useState('')
 
   const { data: policies = [], isLoading } = useQuery({
-    queryKey: ['pa_policies', profile?.org_id],
+    queryKey: ['lc_policies', profile?.org_id],
     enabled: !!profile?.org_id,
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('pa_policies')
+        .from('lc_policies')
         .select('id, carrier, policy_number, named_insured, effective_date, expiration_date, state_issued, policy_form, per_occurrence_limit, extraction_status')
         .eq('org_id', profile.org_id)
         .order('effective_date', { ascending: false })
