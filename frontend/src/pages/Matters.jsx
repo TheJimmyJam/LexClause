@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { FolderOpen, Plus, AlertTriangle, CheckCircle2, Loader2, Search } from 'lucide-react'
+import { FolderOpen, Plus, AlertTriangle, CheckCircle2, Loader2, Search, Upload } from 'lucide-react'
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
@@ -65,9 +65,14 @@ export default function Matters() {
           <h1 className="text-3xl font-bold text-slate-900">Matters</h1>
           <p className="text-slate-600 mt-1">Coverage matters where allocation analyses live.</p>
         </div>
-        <button onClick={() => setCreating(true)} className="btn-primary">
-          <Plus className="h-4 w-4" /> New Matter
-        </button>
+        <div className="flex items-center gap-2">
+          <Link to="/matters/intake" className="btn-secondary">
+            <Upload className="h-4 w-4" /> From a document
+          </Link>
+          <button onClick={() => setCreating(true)} className="btn-primary">
+            <Plus className="h-4 w-4" /> New Matter
+          </button>
+        </div>
       </header>
 
       {creating && (
