@@ -23,7 +23,7 @@ The output should be (1) a per-carrier dollar allocation and (2) a methodology m
 ┌────────────────────────────────────────────────────────────────────┐
 │  Layer 2 — Deterministic rules (allocation math + state law)       │
 │                                                                    │
-│  • Coded state-law catalog (stateLaw.js + pa_state_law_rules)      │
+│  • Coded state-law catalog (stateLaw.js + lc_state_law_rules)      │
 │  • Coded allocation algorithms (pro-rata-time, all-sums, etc.)     │
 │  • Reconciles other-insurance clauses with controlling law         │
 └────────────────────────────────────────────────────────────────────┘
@@ -35,16 +35,16 @@ The reason for the split: an LLM is good at reading prose and producing prose. I
 
 ### 1. Ingest policies
 
-User uploads PDFs to `pa-policies` storage bucket. For each PDF:
+User uploads PDFs to `lc-policies` storage bucket. For each PDF:
 
 1. Extract raw text (pdf-parse, pdftotext, or Anthropic's PDF input API).
 2. Pass text to Claude with the **EXTRACT_SYSTEM** prompt (see Edge Function).
 3. Claude returns a strict-shape JSON object — limits, dates, other-insurance clause verbatim, endorsements, exclusions, and a handful of boolean flags (anti-stacking, non-cumulation, etc.).
-4. Persist into `pa_policies` + child tables. Status moves `pending → extracting → complete | failed`.
+4. Persist into `lc_policies` + child tables. Status moves `pending → extracting → complete | failed`.
 
 ### 2. Define the matter
 
-User creates a `pa_matter`, fills in:
+User creates a `lc_matter`, fills in:
 
 - **Loss type** (environmental / construction defect / asbestos / cyber / etc.)
 - **Loss start & end dates** — drives time-on-risk math
@@ -55,7 +55,7 @@ User creates a `pa_matter`, fills in:
 - **Governing state** — the user's choice for controlling law
 - Optional **trigger theory** override (otherwise pick the state's default)
 
-User attaches policies via `pa_matter_policies`.
+User attaches policies via `lc_matter_policies`.
 
 ### 3. Choice-of-law screening
 
@@ -109,7 +109,7 @@ Self-insured retentions and deductibles eat into the insured's exposure first. O
 
 ### 9. Generate the methodology memo
 
-Claude takes the matter facts + state rule + per-policy results and produces a 1-3 paragraph memo: trigger choice, allocation method, why this rule applies in the controlling state, with at least one citation. The Edge Function stores it on `pa_analyses.methodology_text`.
+Claude takes the matter facts + state rule + per-policy results and produces a 1-3 paragraph memo: trigger choice, allocation method, why this rule applies in the controlling state, with at least one citation. The Edge Function stores it on `lc_analyses.methodology_text`.
 
 ## Output shape
 
@@ -146,7 +146,7 @@ Claude takes the matter facts + state rule + per-policy results and produces a 1
 
 ## Extension hooks
 
-- Per-org **state-law overrides** — `pa_state_law_rules` is mutable; some firms will want their own house rules.
+- Per-org **state-law overrides** — `lc_state_law_rules` is mutable; some firms will want their own house rules.
 - **Carter-Wallace allocation** (NJ) — special pro-rata algorithm for continuous-trigger asbestos cases. Add as a separate method when needed.
 - **Excess "drop-down" coverage** when underlying carriers are insolvent.
 - **Cross-matter precedent search** — surface prior LexClause analyses by the same carrier on the same loss type.
