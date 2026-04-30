@@ -8,7 +8,7 @@ export default {
         sans: ['Inter', 'ui-sans-serif', 'system-ui', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'sans-serif'],
       },
       colors: {
-        // LexClause brand: teal — sets it apart from LexAlloc's indigo while feeling parallel.
+        // LexClause brand: teal.
         brand: {
           50:  'var(--brand-50)',
           100: 'var(--brand-100)',
