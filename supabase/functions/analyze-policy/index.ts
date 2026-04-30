@@ -1,20 +1,20 @@
 // supabase/functions/analyze-policy/index.ts
 //
-// LexClause Edge Function — handles two modes:
-//   1. mode = 'extract_terms' — Claude reads a stored policy PDF and writes
-//      structured fields back to lc_policies (+ endorsements/exclusions).
-//   2. mode = 'allocate'      — Combines policies, the matter, and state-law
-//      rules into an allocation result; writes lc_analyses + lc_analysis_results.
+// LexClause analysis engine. Two modes:
+//   1. mode = 'extract_terms' — Reads a stored policy PDF and writes structured
+//      fields back to lc_policies (+ endorsements/exclusions). Uses Anthropic's
+//      native PDF input (no separate OCR step).
+//   2. mode = 'allocate'      — Combines policies, the matter, and the chosen
+//      governing-state rule into an allocation result; writes lc_analyses +
+//      lc_analysis_results with a methodology memo.
 //
-// Required Edge Function secrets:
-//   ANTHROPIC_API_KEY     — Claude API key
-//   SUPABASE_URL          — auto-populated by Supabase
-//   SUPABASE_SERVICE_ROLE_KEY — auto-populated by Supabase
-//
-// This file is a starting skeleton. Tighten the prompts, add token-limit
-// handling, and split into helpers as the analysis surface grows.
+// Required Edge Function secrets (set via `supabase secrets set`):
+//   ANTHROPIC_API_KEY
+//   ANTHROPIC_MODEL          (optional, default claude-sonnet-4-6)
+//   SUPABASE_URL             (auto)
+//   SUPABASE_SERVICE_ROLE_KEY (auto)
 
-// @ts-nocheck   // Deno-typed; tsc check disabled for the editor
+// @ts-nocheck
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 
@@ -29,23 +29,8 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// ---------- Claude wrappers ---------------------------------------------------
-
-async function claude({ system, messages, max_tokens = 4096 }) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method:  'POST',
-    headers: {
-      'Content-Type':       'application/json',
-      'x-api-key':          ANTHROPIC_API_KEY,
-      'anthropic-version':  '2023-06-01',
-    },
-    body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens, system, messages }),
-  })
-  if (!r.ok) throw new Error(`Claude error: ${r.status} ${await r.text()}`)
-  return await r.json()
-}
-
-const EXTRACT_SYSTEM = `You are a senior coverage attorney reading a single insurance policy. Extract structured data and return ONE JSON object that matches this exact shape — no prose, no markdown:
+// ── Prompts ─────────────────────────────────────────────────────────────────
+const EXTRACT_SYSTEM = `You are a senior coverage attorney reading a single insurance policy PDF. Extract structured data and return ONE JSON object that matches this exact shape — no prose, no markdown, no code fences:
 
 {
   "carrier": string|null,
@@ -75,12 +60,13 @@ const EXTRACT_SYSTEM = `You are a senior coverage attorney reading a single insu
 }
 
 Rules:
-- Quote other-insurance and allocation language verbatim where possible (it's the operative text).
-- For amounts, return integers in USD (no commas, no $).
-- If a field isn't in the document, use null. Do NOT guess.
-- state_issued: 2-letter postal code. Use the state on the declarations page or on filings; if absent, null.`
+- Quote other-insurance and allocation language verbatim where possible — that text is the operative legal language.
+- Amounts as integers in USD (no commas, no $).
+- Use null when the document does not state a value. Do NOT guess.
+- state_issued: 2-letter US postal code from the declarations or filings; null if absent.
+- Output MUST be valid JSON. No prose, no markdown fences, just the JSON.`
 
-const ALLOCATE_SYSTEM = `You are a coverage attorney drafting a methodology memo for a multi-policy allocation. You will be given the matter facts, the relevant policies (already extracted), and the controlling state's allocation rule. Produce ONE JSON object — no prose:
+const ALLOCATE_SYSTEM = `You are a coverage attorney drafting a methodology memo for a multi-policy allocation. You will be given the matter facts, the relevant policies (already extracted), and the controlling state's allocation rule. Produce ONE JSON object — no prose, no markdown:
 
 {
   "allocation_method": "pro_rata_time_on_risk"|"pro_rata_by_limits"|"all_sums"|"all_sums_with_reallocation"|"equal_shares"|"targeted_tender"|"undetermined",
@@ -93,66 +79,116 @@ const ALLOCATE_SYSTEM = `You are a coverage attorney drafting a methodology memo
       "policy_effective": "YYYY-MM-DD",
       "policy_expiration": "YYYY-MM-DD",
       "policy_state_issued": string,
-      "share_pct": number,            // 0..1
-      "allocated_amount": number,     // USD
-      "rationale": string             // ≤2 sentences
+      "share_pct": number,
+      "allocated_amount": number,
+      "rationale": string
     }
   ],
-  "methodology_text": string          // 1-3 paragraph memo: trigger choice, allocation method, why this rule applies, citation
+  "methodology_text": string
 }
 
 Rules:
-- Sum of share_pct across results must equal 1.0 (within 0.001).
-- Sum of allocated_amount must equal the matter's damages_exposure.
-- Cite at least one controlling case from the governing state.
-- If facts are insufficient (e.g. damages_exposure unknown), set allocation_method = "undetermined" and explain in methodology_text.`
+- Sum of share_pct must equal 1.0 (within 0.001).
+- Sum of allocated_amount must equal damages_exposure.
+- Cite at least one controlling case from the governing state in methodology_text.
+- If facts are insufficient (e.g. no damages exposure), set allocation_method = "undetermined" and explain what is missing.
+- methodology_text: 1-3 paragraphs. Trigger choice, allocation rule, why this rule applies under the governing state's law, citation.`
 
-// ---------- Mode handlers -----------------------------------------------------
+// ── Helpers ─────────────────────────────────────────────────────────────────
+async function downloadAsBase64(supabase, bucket, storagePath) {
+  const { data, error } = await supabase.storage.from(bucket).download(storagePath)
+  if (error) throw new Error(`Storage download failed: ${error.message}`)
+  const buf = new Uint8Array(await data.arrayBuffer())
+  let binary = ''
+  const chunk = 0x8000
+  for (let i = 0; i < buf.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, Array.from(buf.subarray(i, i + chunk)))
+  }
+  return btoa(binary)
+}
 
+function parseJsonFromClaude(text) {
+  const cleaned = text
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/```\s*$/i, '')
+    .trim()
+  return JSON.parse(cleaned)
+}
+
+async function callClaude({ system, userContent, max_tokens = 4096 }) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type':      'application/json',
+      'x-api-key':         ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: CLAUDE_MODEL,
+      max_tokens,
+      system,
+      messages: [{ role: 'user', content: userContent }],
+    }),
+  })
+  if (!r.ok) {
+    const errText = await r.text()
+    throw new Error(`Anthropic ${r.status}: ${errText.slice(0, 500)}`)
+  }
+  return await r.json()
+}
+
+// ── Mode: extract_terms ─────────────────────────────────────────────────────
 async function handleExtract(supabase, policyId) {
   const { data: policy, error: pErr } = await supabase.from('lc_policies').select('*').eq('id', policyId).single()
   if (pErr || !policy) throw new Error('Policy not found')
-
-  // Download the PDF text. (For v1 we assume the upstream uploader provides
-  // text; for production, pipe the PDF through a parser like pdf-parse or
-  // Anthropic's PDF input feature.)
-  // TODO: wire real PDF ingestion. For now, error if source_text is empty so
-  // the pipeline surfaces the gap.
-  if (!policy.source_text) {
+  if (!policy.source_storage_path) {
     await supabase.from('lc_policies').update({
       extraction_status: 'failed',
-      extraction_error:  'No source_text on record. PDF text extraction not yet wired up.',
+      extraction_error:  'No source_storage_path on policy.',
     }).eq('id', policyId)
-    return { ok: false, reason: 'no_source_text' }
+    return { ok: false, reason: 'no_storage_path' }
   }
 
-  const r = await claude({
-    system: EXTRACT_SYSTEM,
-    messages: [{ role: 'user', content: policy.source_text.slice(0, 180_000) }],
-    max_tokens: 4096,
-  })
-  const text = r.content?.[0]?.text || ''
-  let parsed
-  try { parsed = JSON.parse(text) } catch { throw new Error('Claude returned non-JSON: ' + text.slice(0, 200)) }
+  await supabase.from('lc_policies').update({ extraction_status: 'extracting', extraction_error: null }).eq('id', policyId)
 
-  const update = {
-    carrier:                parsed.carrier,
-    policy_number:          parsed.policy_number,
-    named_insured:          parsed.named_insured,
-    additional_insureds:    parsed.additional_insureds || [],
-    effective_date:         parsed.effective_date,
-    expiration_date:        parsed.expiration_date,
-    state_issued:           parsed.state_issued,
-    policy_form:            parsed.policy_form,
-    per_occurrence_limit:   parsed.per_occurrence_limit,
-    general_aggregate:      parsed.general_aggregate,
-    products_aggregate:     parsed.products_aggregate,
-    self_insured_retention: parsed.self_insured_retention,
-    deductible:             parsed.deductible,
-    attachment_point:       parsed.attachment_point,
-    other_insurance_clause: parsed.other_insurance_clause,
-    other_insurance_type:   parsed.other_insurance_type,
-    allocation_method_text: parsed.allocation_method_text,
+  let parsed
+  try {
+    const pdfB64 = await downloadAsBase64(supabase, 'lc-policies', policy.source_storage_path)
+    const claudeResp = await callClaude({
+      system: EXTRACT_SYSTEM,
+      userContent: [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfB64 } },
+        { type: 'text', text: 'Extract the policy data from the attached PDF. Return only the JSON object - no prose.' },
+      ],
+      max_tokens: 4096,
+    })
+    const text = claudeResp.content?.[0]?.text || ''
+    parsed = parseJsonFromClaude(text)
+  } catch (e) {
+    const msg = String(e?.message || e).slice(0, 1000)
+    await supabase.from('lc_policies').update({ extraction_status: 'failed', extraction_error: msg }).eq('id', policyId)
+    throw e
+  }
+
+  await supabase.from('lc_policies').update({
+    carrier:                parsed.carrier ?? null,
+    policy_number:          parsed.policy_number ?? null,
+    named_insured:          parsed.named_insured ?? null,
+    additional_insureds:    parsed.additional_insureds ?? [],
+    effective_date:         parsed.effective_date ?? null,
+    expiration_date:        parsed.expiration_date ?? null,
+    state_issued:           parsed.state_issued ?? null,
+    policy_form:            parsed.policy_form ?? null,
+    per_occurrence_limit:   parsed.per_occurrence_limit ?? null,
+    general_aggregate:      parsed.general_aggregate ?? null,
+    products_aggregate:     parsed.products_aggregate ?? null,
+    self_insured_retention: parsed.self_insured_retention ?? null,
+    deductible:             parsed.deductible ?? null,
+    attachment_point:       parsed.attachment_point ?? null,
+    other_insurance_clause: parsed.other_insurance_clause ?? null,
+    other_insurance_type:   parsed.other_insurance_type ?? null,
+    allocation_method_text: parsed.allocation_method_text ?? null,
     has_anti_stacking_clause:           !!parsed.has_anti_stacking_clause,
     has_non_cumulation_clause:          !!parsed.has_non_cumulation_clause,
     has_prior_acts_exclusion:           !!parsed.has_prior_acts_exclusion,
@@ -162,24 +198,31 @@ async function handleExtract(supabase, policyId) {
     extraction_error:  null,
     extracted_at:      new Date().toISOString(),
     raw_extraction:    parsed,
-  }
-  await supabase.from('lc_policies').update(update).eq('id', policyId)
+  }).eq('id', policyId)
 
-  // Replace endorsements + exclusions
   await supabase.from('lc_policy_endorsements').delete().eq('policy_id', policyId)
   await supabase.from('lc_policy_exclusions').delete().eq('policy_id', policyId)
   if (Array.isArray(parsed.endorsements) && parsed.endorsements.length) {
-    await supabase.from('lc_policy_endorsements')
-      .insert(parsed.endorsements.map((e) => ({ ...e, policy_id: policyId })))
+    await supabase.from('lc_policy_endorsements').insert(parsed.endorsements.map((e) => ({
+      policy_id:      policyId,
+      endorsement_no: e.endorsement_no ?? null,
+      label:          e.label ?? '',
+      text:           e.text  ?? '',
+      effect:         e.effect ?? null,
+    })))
   }
   if (Array.isArray(parsed.exclusions) && parsed.exclusions.length) {
-    await supabase.from('lc_policy_exclusions')
-      .insert(parsed.exclusions.map((e) => ({ ...e, policy_id: policyId })))
+    await supabase.from('lc_policy_exclusions').insert(parsed.exclusions.map((e) => ({
+      policy_id: policyId,
+      label:     e.label ?? '',
+      text:      e.text  ?? '',
+    })))
   }
 
-  return { ok: true, policy_id: policyId }
+  return { ok: true, policy_id: policyId, parsed }
 }
 
+// ── Mode: allocate ──────────────────────────────────────────────────────────
 async function handleAllocate(supabase, matterId, opts = {}) {
   const { data: matter } = await supabase
     .from('lc_matters')
@@ -194,9 +237,9 @@ async function handleAllocate(supabase, matterId, opts = {}) {
   if (!governingState) throw new Error('Matter has no governing_state')
   if (!policies.length) throw new Error('Matter has no policies attached')
 
-  const { data: rule } = await supabase.from('lc_state_law_rules').select('*').eq('state_code', governingState).single()
+  const { data: rule } = await supabase.from('lc_state_law_rules').select('*').eq('state_code', governingState).maybeSingle()
 
-  const userMessage = JSON.stringify({
+  const userPayload = JSON.stringify({
     matter: {
       name:             matter.name,
       loss_type:        matter.loss_type,
@@ -226,7 +269,6 @@ async function handleAllocate(supabase, matterId, opts = {}) {
     })),
   })
 
-  // Create the analysis row up front so we have an id to return / write to
   const { data: analysis, error: aErr } = await supabase
     .from('lc_analyses')
     .insert({
@@ -242,13 +284,13 @@ async function handleAllocate(supabase, matterId, opts = {}) {
   if (aErr) throw aErr
 
   try {
-    const r = await claude({
-      system:   ALLOCATE_SYSTEM,
-      messages: [{ role: 'user', content: userMessage }],
+    const claudeResp = await callClaude({
+      system: ALLOCATE_SYSTEM,
+      userContent: [{ type: 'text', text: userPayload }],
       max_tokens: 4096,
     })
-    const text = r.content?.[0]?.text || ''
-    const parsed = JSON.parse(text)
+    const text = claudeResp.content?.[0]?.text || ''
+    const parsed = parseJsonFromClaude(text)
 
     await supabase.from('lc_analyses').update({
       allocation_method: parsed.allocation_method,
@@ -259,10 +301,30 @@ async function handleAllocate(supabase, matterId, opts = {}) {
     }).eq('id', analysis.id)
 
     if (Array.isArray(parsed.results) && parsed.results.length) {
+      // Map Claude's results back to real policy UUIDs by (carrier, policy_number).
+      // We can't trust Claude to echo the UUID character-perfect — it sometimes
+      // transcribes one wrong, which then fails the FK insert.
+      const byKey = new Map()
+      for (const p of policies) {
+        byKey.set(`${(p.carrier || '').trim()}|${(p.policy_number || '').trim()}`, p.id)
+        // Also key by id alone as a fallback
+        byKey.set(p.id, p.id)
+      }
+      const resolvePolicyId = (row) => {
+        if (row.policy_id && byKey.has(row.policy_id)) return row.policy_id
+        const k = `${(row.carrier || '').trim()}|${(row.policy_number || '').trim()}`
+        if (byKey.has(k)) return byKey.get(k)
+        // Last resort: match by policy_number only
+        for (const p of policies) {
+          if ((p.policy_number || '').trim() === (row.policy_number || '').trim()) return p.id
+        }
+        return null
+      }
+
       await supabase.from('lc_analysis_results').insert(
         parsed.results.map((row, i) => ({
           analysis_id:         analysis.id,
-          policy_id:           row.policy_id,
+          policy_id:           resolvePolicyId(row),
           carrier:             row.carrier,
           policy_number:       row.policy_number,
           policy_effective:    row.policy_effective,
@@ -276,23 +338,20 @@ async function handleAllocate(supabase, matterId, opts = {}) {
       )
     }
 
-    return { ok: true, analysisId: analysis.id }
+    return { ok: true, analysisId: analysis.id, parsed }
   } catch (e) {
-    await supabase.from('lc_analyses').update({ status: 'failed', error: String(e) }).eq('id', analysis.id)
+    await supabase.from('lc_analyses').update({ status: 'failed', error: String(e?.message || e).slice(0, 1000) }).eq('id', analysis.id)
     throw e
   }
 }
 
-// ---------- HTTP entrypoint ---------------------------------------------------
-
+// ── HTTP entrypoint ─────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
     const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride } = await req.json()
 
-    // Use the caller's auth so RLS is enforced. Fall back to service role only
-    // for operations that need to write across orgs (we don't here — yet).
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
       global: { headers: { Authorization: authHeader } },
