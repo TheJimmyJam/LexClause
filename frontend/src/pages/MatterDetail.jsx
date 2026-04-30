@@ -76,13 +76,18 @@ export default function MatterDetail() {
     setRunning(true)
     try {
       const result = await runAllocationAnalysis(matterId)
-      toast.success('Analysis complete.')
+      // The edge function returns immediately with analysisId; the actual
+      // Claude work continues in the background. We navigate to the analysis
+      // page right away — it polls for status until 'complete' or 'failed'.
       qc.invalidateQueries({ queryKey: ['lc_matter', matterId] })
       if (result?.analysisId) {
+        toast.success('Analysis started — running in the background.')
         navigate(`/matters/${matterId}/analysis/${result.analysisId}`)
+      } else {
+        toast.error('Analysis failed to start.')
       }
     } catch (e) {
-      toast.error(e.message || 'Analysis failed.')
+      toast.error(e.message || 'Analysis failed to start.')
     } finally {
       setRunning(false)
     }
