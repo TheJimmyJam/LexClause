@@ -16,15 +16,12 @@ export default function Settings() {
           <Field label="First name" value={profile?.first_name} />
           <Field label="Last name" value={profile?.last_name} />
         </div>
-        <p className="text-xs text-slate-500 mt-4">
-          Profile fields are shared with LexAlloc. Update them on either site.
-        </p>
       </div>
 
       <div className="card p-6 mb-6">
         <h2 className="font-semibold text-slate-900 mb-4">Organization</h2>
         <div className="grid sm:grid-cols-2 gap-4 text-sm">
-          <Field label="Organization" value={profile?.la_organizations?.name} />
+          <Field label="Organization" value={profile?.organization?.name} />
           <Field label="Org ID" value={profile?.org_id} />
         </div>
       </div>
@@ -35,7 +32,7 @@ export default function Settings() {
           <li>Custom state-law overrides per matter</li>
           <li>Carrier-tier pricing and umbrella attachment configuration</li>
           <li>Memo template editor</li>
-          <li>Cross-link matters between LexClause and LexAlloc</li>
+          <li>Team invitations and role management</li>
         </ul>
       </div>
     </div>
