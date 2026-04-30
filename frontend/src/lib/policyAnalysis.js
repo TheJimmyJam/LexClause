@@ -20,6 +20,18 @@ export async function extractPolicyTerms(policyId) {
   return data
 }
 
+/** Pull matter-intake fields out of an FNOL/ROR/claim-summary PDF.
+ *  Pass the storagePath (already uploaded to lc-matter-docs).
+ *  Returns { parsed: { matter_name, named_insured, loss_type, ... }, storagePath }.
+ */
+export async function extractMatterFromDocument(storagePath) {
+  const { data, error } = await supabase.functions.invoke('analyze-policy', {
+    body: { mode: 'extract_matter', storagePath },
+  })
+  if (error) throw error
+  return data
+}
+
 /** Run the multi-policy / multi-state allocation analysis for a matter. */
 export async function runAllocationAnalysis(matterId, opts = {}) {
   const { data, error } = await supabase.functions.invoke('analyze-policy', {
