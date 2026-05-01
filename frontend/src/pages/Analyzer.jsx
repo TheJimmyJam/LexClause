@@ -428,9 +428,15 @@ export default function Analyzer() {
     }
   }
 
+  // Poll the analysis until it completes, fails, or times out. If the engine
+  // gets stuck in "running" for >3 minutes, we treat it as a hung background
+  // task (Supabase Edge Function instance reaped before completion). Mark it
+  // failed in the DB so the surrounding try/catch can surface a clean retry
+  // CTA, rather than leaving the user trapped on the spinner.
   async function pollAnalysis(id, onProgress) {
+    const STUCK_AFTER_MS = 3 * 60_000
     const start = Date.now()
-    while (Date.now() - start < 5 * 60_000) {
+    while (Date.now() - start < STUCK_AFTER_MS + 30_000) {
       const { data } = await supabase
         .from('lc_analyses')
         .select('*, lc_analysis_results(*), lc_matters(name)')
@@ -439,24 +445,38 @@ export default function Analyzer() {
       if (data?.validation_attempts && data.validation_attempts > 0 && data.status !== 'complete') {
         onProgress?.(`validating · attempt ${data.validation_attempts}/3`)
       } else if (data?.status === 'running' || data?.status === 'pending') {
-        onProgress?.('engine running')
+        const elapsed = Math.floor((Date.now() - start) / 1000)
+        onProgress?.(`engine running · ${elapsed}s elapsed`)
       }
       if (data?.status === 'failed') {
-        // Throw so the surrounding try/catch surfaces a real failure state
         throw new Error(data.error || 'Engine returned a failed analysis')
       }
       if (data?.status === 'complete') {
         setAnalysis(data)
         return
       }
+      // Stuck-task recovery: if running for >3 min with no progress, mark failed
+      // so the user isn't trapped on the spinner forever.
+      if ((data?.status === 'running' || data?.status === 'pending') &&
+          Date.now() - start > STUCK_AFTER_MS) {
+        await supabase
+          .from('lc_analyses')
+          .update({
+            status: 'failed',
+            error:  'Background task did not complete within 3 minutes (Edge Function instance was likely reaped). Please retry.',
+          })
+          .eq('id', id)
+        throw new Error('Engine ran past its time budget. The analysis was stopped — please retry.')
+      }
       await new Promise(r => setTimeout(r, 2000))
     }
-    throw new Error('Analysis timed out after 5 minutes')
+    throw new Error('Analysis timed out')
   }
 
   async function pollComparison(groupId, onProgress) {
+    const STUCK_AFTER_MS = 3 * 60_000
     const start = Date.now()
-    while (Date.now() - start < 5 * 60_000) {
+    while (Date.now() - start < STUCK_AFTER_MS + 30_000) {
       const { data } = await supabase
         .from('lc_analyses')
         .select('*, lc_analysis_results(*)')
@@ -469,9 +489,26 @@ export default function Analyzer() {
         setComparison(data)
         return
       }
+      // Sweep any analyses in this comparison group that have been running
+      // beyond the stuck threshold — same recovery as single-state.
+      if (Date.now() - start > STUCK_AFTER_MS && total > 0 && done < total) {
+        const stuckIds = (data || [])
+          .filter(a => a.status === 'running' || a.status === 'pending')
+          .map(a => a.id)
+        if (stuckIds.length) {
+          await supabase
+            .from('lc_analyses')
+            .update({
+              status: 'failed',
+              error:  'Background task did not complete within 3 minutes. Please retry.',
+            })
+            .in('id', stuckIds)
+        }
+        throw new Error(`${stuckIds.length} of ${total} jurisdictions ran past their time budget. Please retry.`)
+      }
       await new Promise(r => setTimeout(r, 2000))
     }
-    throw new Error('Comparison timed out after 5 minutes')
+    throw new Error('Comparison timed out')
   }
 
   // ── Render ───────────────────────────────────────────────────────────────
