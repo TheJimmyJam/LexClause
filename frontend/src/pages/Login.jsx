@@ -123,13 +123,18 @@ export function AuthShell({ title, subtitle, children, wide = false }) {
           <div className="p-8">{children}</div>
         </div>
 
-        {/* Footer brand mark */}
+        {/* Footer brand mark + legal links */}
         <div className="text-center text-xs text-slate-400 mt-6 tracking-wide">
           <span className="font-serif-brand text-brand-300">LexClause</span>
           <span className="mx-2 text-slate-600">·</span>
           <span style={{ fontVariant: 'all-small-caps' }}>
             Citations drawn only from the curated catalog
           </span>
+        </div>
+        <div className="text-center text-[11px] text-slate-500 mt-2">
+          <Link to="/terms"   className="hover:text-brand-300 mx-2">Terms</Link>
+          <span className="text-slate-600">·</span>
+          <Link to="/privacy" className="hover:text-brand-300 mx-2">Privacy</Link>
         </div>
       </div>
     </div>
