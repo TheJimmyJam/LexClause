@@ -485,11 +485,9 @@ function DropZone({ getRootProps, getInputProps, isDragActive, phase }) {
             height={size.h - INSET * 2}
             rx={RADIUS}
             ry={RADIUS}
-            fill="none"
-            stroke="var(--brand-600)"
             strokeWidth={STROKE}
             strokeDasharray={`${DASH} ${DASH}`}
-            className={`lc-dash-stroke ${isPaused ? 'is-paused' : ''}`}
+            className={`lc-dash-stroke lc-dash-blue ${isPaused ? 'is-paused' : ''}`}
           />
           {/* White dashes — same animation, half-cycle delayed → alternating color effect */}
           <rect
@@ -499,11 +497,9 @@ function DropZone({ getRootProps, getInputProps, isDragActive, phase }) {
             height={size.h - INSET * 2}
             rx={RADIUS}
             ry={RADIUS}
-            fill="none"
-            stroke="#ffffff"
             strokeWidth={STROKE}
             strokeDasharray={`${DASH} ${DASH}`}
-            className={`lc-dash-stroke lc-dash-offset ${isPaused ? 'is-paused' : ''}`}
+            className={`lc-dash-stroke lc-dash-white lc-dash-offset ${isPaused ? 'is-paused' : ''}`}
           />
         </svg>
       )}
