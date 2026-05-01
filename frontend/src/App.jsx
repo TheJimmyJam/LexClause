@@ -7,6 +7,8 @@ import Landing        from './pages/Landing.jsx'
 import Login          from './pages/Login.jsx'
 import Register       from './pages/Register.jsx'
 import ForgotPassword from './pages/ForgotPassword.jsx'
+import Terms          from './pages/Terms.jsx'
+import Privacy        from './pages/Privacy.jsx'
 import Analyzer       from './pages/Analyzer.jsx'
 import Matters        from './pages/Matters.jsx'
 import Analysis       from './pages/Analysis.jsx'
@@ -51,6 +53,8 @@ export default function App() {
         <Route path="/login"           element={<PublicRoute><Login /></PublicRoute>} />
         <Route path="/register"        element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/terms"           element={<Terms />} />
+        <Route path="/privacy"         element={<Privacy />} />
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           {/* Primary one-shot Analyzer */}
