@@ -1,0 +1,147 @@
+{
+  "trigger_analysis": [
+    {
+      "policy_id": "pol-aetna-cgl-1985",
+      "carrier": "Aetna",
+      "policy_number": "AET-CGL-1985-001",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Count 1: Negligence \u2014 'negligently failed to identify, control, or warn of asbestos-containing materials at its facility, resulting in continuous occupational exposure of Plaintiff from 1985 through 1998'",
+        "Count 2: Failure to warn \u2014 'failed to warn workers of the known dangers of asbestos exposure'",
+        "Count 3: Strict products liability \u2014 'utilized inherently dangerous asbestos-containing products throughout the relevant period without adequate safety controls'"
+      ],
+      "coverage_grant_basis": "The policy is an occurrence-based CGL with bodily injury coverage. The allegations describe bodily injury (mesothelioma diagnosis in 2024 from exposure during the policy period 1985\u20131990) arising from Plaintiff's occupational exposure to asbestos products at Mason Industrial's facility. All three counts allege negligence, failure to warn, or products liability theories that traditionally fall within CGL bodily injury coverage.",
+      "exclusions_considered": [
+        {
+          "label": "No asbestos exclusion (pre-1985 form)",
+          "applies": false,
+          "rationale": "The policy explicitly does not contain an asbestos-specific exclusion. The qualified pollution exclusion applies only to sudden-and-accidental releases of pollutants in an environmental context, not to occupational exposure to asbestos products incorporated into facility materials."
+        }
+      ],
+      "rationale": "Under California's 'potentiality of coverage' standard and continuous-trigger doctrine, the Aetna 1985\u20131990 CGL is triggered. The allegations of negligent exposure to asbestos-containing materials at Mason Industrial's facility during 1985\u20131998 create a potential for coverage under bodily injury provisions. Critically, the policy period (1985\u20131990) overlaps with the first portion of the alleged continuous exposure period (1985\u20131998), and the injury (mesothelioma) is a classic long-tail occupational disease. Under California's continuous-trigger rule established in Montrose I, every policy in effect during exposure is triggered. The absence of an asbestos exclusion in this pre-1985 form, combined with the policy's occurrence basis, means no exclusion bars coverage. The duty to defend applies. (Gray v. Zurich Ins. Co., 65 Cal.2d 263 (1966); Montrose Chem. Corp. v. Admiral Ins. (Montrose I), 10 Cal.4th 645 (1995))"
+    },
+    {
+      "policy_id": "pol-travelers-cgl-1990",
+      "carrier": "Travelers",
+      "policy_number": "TRV-CGL-1990-002",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Count 1: Negligence \u2014 'negligently failed to identify, control, or warn of asbestos-containing materials at its facility, resulting in continuous occupational exposure of Plaintiff from 1985 through 1998'",
+        "Count 2: Failure to warn \u2014 'failed to warn workers of the known dangers of asbestos exposure'",
+        "Count 3: Strict products liability \u2014 'utilized inherently dangerous asbestos-containing products throughout the relevant period without adequate safety controls'"
+      ],
+      "coverage_grant_basis": "The policy is an occurrence-based CGL with bodily injury coverage. The allegations describe bodily injury arising from occupational exposure to asbestos products during Travelers' policy period (1990\u20131995), which falls within the broader continuous-exposure window (1985\u20131998).",
+      "exclusions_considered": [
+        {
+          "label": "Pollution exclusion (qualified)",
+          "applies": false,
+          "rationale": "The policy contains a qualified pollution exclusion that carves out sudden-and-accidental discharges. The policy text explicitly states: 'Asbestos products incorporated into manufactured goods or building materials are not pollutants under this exclusion.' Thus, occupational exposure to asbestos products in the facility is not barred by the pollution exclusion, which is tailored to environmental contamination, not occupational inhalation."
+        }
+      ],
+      "rationale": "The Travelers 1990\u20131995 CGL is triggered under California's continuous-trigger doctrine. The allegations describe continuous occupational exposure to asbestos-containing materials throughout 1985\u20131998, of which the Travelers period (1990\u20131995) captures the middle years. Under Montrose I, every policy in effect during the exposure period is triggered. The qualified pollution exclusion does not apply because asbestos products incorporated into facility materials are explicitly carved out. The duty to defend applies. (Montrose Chem. Corp. v. Admiral Ins. (Montrose I), 10 Cal.4th 645 (1995); Buss v. Superior Court, 16 Cal.4th 35 (1997))"
+    },
+    {
+      "policy_id": "pol-hartford-cgl-1995",
+      "carrier": "Hartford",
+      "policy_number": "HTF-CGL-1995-003",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Count 1: Negligence \u2014 'negligently failed to identify, control, or warn of asbestos-containing materials at its facility, resulting in continuous occupational exposure of Plaintiff from 1985 through 1998'",
+        "Count 2: Failure to warn \u2014 'failed to warn workers of the known dangers of asbestos exposure'",
+        "Count 3: Strict products liability \u2014 'utilized inherently dangerous asbestos-containing products throughout the relevant period without adequate safety controls'"
+      ],
+      "coverage_grant_basis": "The policy is an occurrence-based CGL with bodily injury coverage. The allegations describe bodily injury from occupational exposure during Hartford's policy period (1995\u20132000), which overlaps the latter portion of the alleged exposure period (1985\u20131998).",
+      "exclusions_considered": [
+        {
+          "label": "Pollution exclusion (absolute)",
+          "applies": false,
+          "rationale": "Although the Hartford policy contains an absolute pollution exclusion (applying regardless of whether discharge was sudden or accidental), the exclusion in standard CGL form applies to the release or escape of pollutants into the environment. Occupational inhalation of asbestos-containing products incorporated into facility materials does not constitute a 'discharge, dispersal, seepage, migration, release or escape of pollutants' in the environmental sense. The exclusion is aimed at environmental contamination liability, not workplace exposure to asbestos products. Further, under California's continuous-trigger doctrine, the policy is triggered by virtue of its in-force status during the exposure period; the absolute pollution exclusion does not override the statutory duty to defend for claims arising from occupational bodily injury."
+        }
+      ],
+      "rationale": "The Hartford 1995\u20132000 CGL is triggered under California's continuous-trigger doctrine. The alleged continuous exposure from 1985\u20131998 encompasses the Hartford policy period from its inception (1995) through the end of exposure (1998). Under Montrose I, all policies in effect during the continuous-exposure period are triggered, regardless of when manifestation occurs. Although Hartford carries an absolute pollution exclusion, it does not bar coverage for occupational asbestos exposure because the exclusion targets environmental releases, not workplace inhalation of products. The duty to defend applies. (Montrose Chem. Corp. v. Admiral Ins. (Montrose I), 10 Cal.4th 645 (1995))"
+    },
+    {
+      "policy_id": "pol-libertymutual-umb-1985-2000",
+      "carrier": "Liberty Mutual",
+      "policy_number": "LM-UMB-1985-2000-FF",
+      "policy_form": "UMBRELLA",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Count 1: Negligence \u2014 continuous occupational exposure to asbestos-containing materials",
+        "Count 2: Failure to warn \u2014 failure to warn workers of known dangers of asbestos",
+        "Count 3: Strict products liability \u2014 utilization of inherently dangerous asbestos-containing products"
+      ],
+      "coverage_grant_basis": "The Liberty Mutual umbrella policy is a follow-form umbrella (effective 1985\u20132000) that follows the coverage, conditions, and exclusions of the underlying primary CGLs, except as modified by the umbrella policy itself. The umbrella's per-occurrence limit is $10M, with a $1M attachment point. It covers bodily injury losses to the extent the underlying primaries would cover them, subject to the attachment point being exceeded.",
+      "exclusions_considered": [
+        {
+          "label": "Follow-Form Endorsement (UMB-FF)",
+          "applies": false,
+          "rationale": "The follow-form endorsement requires the umbrella to track the coverage and exclusions of the underlying policies. The underlying policies (Aetna, Travelers, Hartford) are all triggered (see above), and none of them bar coverage by a non-applicable exclusion that would block the umbrella. The umbrella's exclusion list is empty in the provided data. Thus, follow-form does not restrict umbrella coverage."
+        }
+      ],
+      "rationale": "The Liberty Mutual umbrella is triggered because it is a follow-form umbrella covering the same bodily injury allegations implicated by the underlying primary CGLs. The umbrella's continuous-trigger endorsement (noted in the data) further confirms that all years of the umbrella policy period (1985\u20132000) are in effect during the continuous-exposure window. Although the umbrella's attachment point is $1M, the umbrella itself is triggered in potential; it will defend subject to the underlying primaries' exhaustion. Under California's continuous-trigger doctrine, every policy in effect during the exposure period is triggered. (Montrose Chem. Corp. v. Admiral Ins. (Montrose I), 10 Cal.4th 645 (1995))"
+    }
+  ],
+  "priority_analysis": {
+    "ordered_policies": [
+      {
+        "policy_id": "pol-aetna-cgl-1985",
+        "carrier": "Aetna",
+        "policy_number": "AET-CGL-1985-001",
+        "rank": "co-primary",
+        "rank_basis": "All three CGLs (Aetna, Travelers, Hartford) contain mutually repugnant Other Insurance clauses stating they are 'excess over' any other insurance. Under California law, when multiple triggered policies each declare themselves excess, the clauses are deemed mutually repugnant and the policies become co-primary, sharing the burden. The CGLs are treated as a co-primary layer, prorated by their limits ($1M per occurrence each) or on an equal-shares basis. Dart Indus., Inc. v. Commercial Union Ins. Co., 28 Cal.4th 1059 (2002) holds that California gives effect to plain language but resolves conflicts by finding co-primary status when all policies are mutually excess. Fireman's Fund Ins. Co. v. Maryland Cas. Co., 65 Cal.App.4th 1279 (1998) establishes the pro-rata-by-limits approach.",
+        "other_insurance_quote": "If other valid and collectible insurance applies to a loss also covered by this policy, this insurance shall be excess over such other insurance, whether such other insurance is stated to be primary, contributing, excess, contingent, or otherwise.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-travelers-cgl-1990",
+        "carrier": "Travelers",
+        "policy_number": "TRV-CGL-1990-002",
+        "rank": "co-primary",
+        "rank_basis": "Same rationale as Aetna: mutually repugnant Other Insurance clauses among the three CGLs produce co-primary status. Each CGL shares the primary layer pro-rata by limits or equal shares.",
+        "other_insurance_quote": "This insurance is excess over any other valid and collectible insurance available to the insured, whether such other insurance is primary, excess, contingent, or on any other basis.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-hartford-cgl-1995",
+        "carrier": "Hartford",
+        "policy_number": "HTF-CGL-1995-003",
+        "rank": "co-primary",
+        "rank_basis": "Same rationale as Aetna and Travelers: mutually repugnant Other Insurance clauses among the three CGLs. All three CGLs are co-primary and share the primary layer.",
+        "other_insurance_quote": "If other valid and collectible insurance is available to the insured for a loss covered under this policy, our obligations are limited as follows: this insurance is excess over any of the other insurance, whether primary, excess, contingent or on any other basis.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-libertymutual-umb-1985-2000",
+        "carrier": "Liberty Mutual",
+        "policy_number": "LM-UMB-1985-2000-FF",
+        "rank": "excess",
+        "rank_basis": "The Liberty Mutual umbrella policy explicitly states: 'This insurance is excess over, and shall not contribute with, any other insurance available to the insured, whether primary, excess, contingent or on any other basis.' The umbrella has an attachment point of $1M and follows the form of the underlying primary CGLs. Umbrellas by their nature attach above primary policies once the attachment point is satisfied. Here, the CGL layer (co-primary among the three carriers) must be exhausted to $1M (the attachment point) before the umbrella responds. This is consistent with standard umbrella hierarchy: primary CGLs respond first; umbrella excess responds once the attachment point is breached.",
+        "other_insurance_quote": "This insurance is excess over, and shall not contribute with, any other insurance available to the insured, whether primary, excess, contingent or on any other basis. This condition does not apply to insurance specifically purchased to be excess of this policy.",
+        "other_insurance_type": "EXCESS"
+      }
+    ],
+    "mutually_repugnant_groups": [
+      {
+        "policy_ids": [
+          "pol-aetna-cgl-1985",
+          "pol-travelers-cgl-1990",
+          "pol-hartford-cgl-1995"
+        ],
+        "reason": "All three CGL policies contain pure-excess Other Insurance clauses, each stating that the policy is 'excess over' any other insurance. Each clause is conditioned on the existence of 'other valid and collectible insurance,' but in the context of multiple co-triggered CGLs, each policy sees the others as 'other insurance' triggering its excess clause. This creates mutual repugnancy: no single policy can serve as the exclusive primary.",
+        "default_rule": "California resolves such mutual repugnancy by treating the mutually-repugnant policies as co-primary, sharing the burden pro-rata by their per-occurrence limits or on an equal-shares basis depending on equity. Dart Indus., Inc. v. Commercial Union Ins. Co., 28 Cal.4th 1059 (2002) instructs courts to give effect to plain language where possible, but where policies are irreconcilably in conflict, the default is to share the primary obligation. Here, each CGL has a $1M per-occurrence limit and $2M general aggregate, so pro-rata sharing by limits would mean each CGL shares equally at the $1M level (or each contributes $1M / 3 = ~$333K toward a single claim, up to the lower of its own limit or aggregate). Reliance Nat'l Indem. Co. v. Gen. Star Indem. Co., 72 Cal.App.4th 1063 (1999) supports equal-shares where limits are equivalent."
+      }
+    ],
+    "rule_applied": "California gives effect to the plain language of policy provisions, including Other Insurance clauses. When two or more triggered policies each contain excess Other Insurance clauses, the clauses are deemed mutually repugnant and the burden is shared among the co-excess policies, typically pro-rata by limits or equal shares. Dart Indus. applies this principle, as does Fireman's Fund. Reliance Nat'l Indem. Co. v. Gen. Star Indem. Co. supports an equal-shares approach where policies have similar limits.",
+    "rule_citation": "Dart Indus., Inc. v. Commercial Union Ins. Co., 28 Cal.4th 1059 (2002); Fireman's Fund Ins. Co. v. Maryland Cas. Co., 65 Cal.App.4th 1279 (1998); Reliance Nat'l Indem. Co. v. Gen. Star Indem. Co., 72 Cal.App.4th 1063 (1999)"
+  },
+  "exhaustion_analysis": {
+    "rule": "vertical",
+    "rationale": "California applies a vertical (or 'sequential') exhaustion rule, established in Montrose Chem. Corp. v. Superior Court (Montrose II), 9 Cal.5th 215 (2020). Under vertical exhaustion, an excess policy attaches once the directly-underlying primary policy is exhausted, without regard to whether other co-primary policies in the same layer have been fully paid. In this tower, the three co-primary CGLs (Aetna, Travelers, Hartford) sit in the primary layer, sharing the burden pro-rata by limits (or equal shares). As each co-primary CGL is exhausted to the extent of its $1M per-occurrence limit and $2M general aggregate, the insured can tender subsequent claims to the others in the co-primary group. Once the collective primary layer (i.e., the sum of all three CGLs' limits available and exhausted) is depleted, the insured may then tender to the Liberty Mutual umbrella, which will respond above the $1M attachment point. Vertical exhaustion permits the insured to 'stack' the tower by successively draining one primary layer before the excess layer is tapped.",
+    "rule_citation": "Montrose Chem. Corp. v. Superior Court (Montrose II), 9 Cal.5th 215 (2020)"
+  },
+  "narrative": "Mason Industrial faces a multi-policy tower triggered across three CGL carriers and one umbrella. The matter involves continuous occupational exposure to asbestos-containing materials from 1985 through 1998, resulting in a mesothelioma diagnosis in 2024. The allegations span negligence, failure to warn, and products liability theories\u2014all of which traditionally fall within CGL bodily injury coverage.\n\nUnder California's continuous-trigger doctrine (Montrose I), every policy in force during the exposure window is triggered, regardless of when the disease manifests. All four policies\u2014Aetna (1985\u20131990), Travelers (1990\u20131995), Hartford (1995\u20132000), and Liberty Mutual umbrella (1985\u20132000)\u2014are triggered. The Aetna and Travelers policies lack asbestos-specific exclusions; the Hartford policy's absolute pollution exclusion does not apply because occupational inhalation of asbestos products embedded in facility materials is not an 'environmental release' of a pollutant. The Liberty Mutual umbrella, as a follow-form endorsement, tracks the underlying primaries' coverage and exclusions, which are not blocking.\n\nAs to priority, the three CGLs all contain pure-excess Other Insurance clauses, creating mutual repugnancy. Under Dart Indus. and Fireman's Fund, mutually-excess CGLs become co-primary, sharing the burden pro-rata by limits or equal shares. Since each CGL has a $1M per-occurrence limit, the primary layer effectively operates on an equal-shares basis: each carrier's $1M limit is exposed. Once the co-primary CGL layer is exhausted, the Liberty Mutual umbrella (with a $1M attachment point and $10M per-occurrence limit) responds. The umbrella's explicit excess clause and attachment point structure confirm this hierarchy.\n\nUnder California's vertical exhaustion rule (Montrose II), the insured need not exhaust all co-primary CGLs simultaneously. Rather, as each CGL is depleted, the insured may tender to the next, and once all are exhausted, the umbrella responds. This permits sequential layering of the tower."
+}
