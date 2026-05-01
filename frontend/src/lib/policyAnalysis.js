@@ -104,6 +104,25 @@ export async function runCoveragePriority(matterId, opts = {}) {
   return data
 }
 
+/**
+ * Email a generated coverage opinion (.docx + .pdf attachments) to one or
+ * more recipients via the email-opinion edge function (Resend).
+ *
+ * @param {Object}   payload
+ * @param {string[]} payload.recipients     — 1-25 email addresses
+ * @param {string}   [payload.subject]
+ * @param {string}   [payload.message]      — optional cover note
+ * @param {string}   [payload.matter_name]
+ * @param {string}   [payload.governing_state]
+ * @param {Array}    payload.attachments    — [{filename, content_base64, content_type?}]
+ */
+export async function emailOpinion(payload) {
+  const { data, error } = await supabase.functions.invoke('email-opinion', { body: payload })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  return data
+}
+
 /** Run coverage_priority across multiple states in parallel. Returns { comparisonGroupId, analysisIds }. */
 export async function runCoveragePriorityComparison(matterId, states) {
   if (!Array.isArray(states) || states.length < 2) {
