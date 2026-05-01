@@ -1123,7 +1123,7 @@ function ExportMenu({ payload }) {
     setBusy(true); setOpen(false)
     try {
       if (format === 'docx') await downloadMemoDocx(payload)
-      else                     downloadMemoPdf(payload)
+      else                   await downloadMemoPdf(payload)
       toast.success(`Opinion exported as ${format.toUpperCase()}`)
     } catch (e) {
       console.error('Export failed', e)
