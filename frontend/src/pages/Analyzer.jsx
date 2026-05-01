@@ -639,18 +639,129 @@ function MultiStateSelector({ states, onChange, exclude, disabled }) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Running overlay — inline progress while we extract + run priority
+// Running overlay — branded loading state with cycling progress steps
 // ──────────────────────────────────────────────────────────────────────────
 function RunningOverlay() {
+  const steps = [
+    'Classifying documents',
+    'Extracting allegations',
+    'Parsing policy terms',
+    'Building the trigger map',
+    'Resolving priority order',
+    'Drafting the opinion',
+  ]
+  const [activeStep, setActiveStep] = useState(0)
+  useEffect(() => {
+    const id = setInterval(
+      () => setActiveStep(s => (s + 1 < steps.length ? s + 1 : s)),
+      4000,
+    )
+    return () => clearInterval(id)
+  }, [steps.length])
+
   return (
-    <div className="card p-8 border-brand-200/60 bg-gradient-to-br from-brand-50/50 to-cyan-50/30">
-      <div className="flex items-start gap-4">
-        <Loader2 className="h-6 w-6 text-brand-600 animate-spin flex-shrink-0 mt-1" />
-        <div>
-          <h2 className="font-semibold text-slate-900 mb-1">Running coverage-priority analysis…</h2>
-          <p className="text-sm text-slate-600">
-            Extracting allegations, parsing policy terms, and running the trigger / priority / exhaustion analysis. Usually takes 30-90 seconds.
-          </p>
+    <div className="rounded-2xl overflow-hidden border border-brand-200/60 shadow-card">
+      {/* Hero strip with rotating logo */}
+      <div
+        className="relative px-6 py-8 text-white"
+        style={{
+          background:
+            'linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 45%, var(--brand-500) 100%)',
+        }}
+      >
+        {/* Subtle animated shimmer overlay */}
+        <div
+          className="absolute inset-0 opacity-30 pointer-events-none"
+          style={{
+            background:
+              'repeating-linear-gradient(45deg, transparent 0 14px, rgba(255,255,255,0.08) 14px 16px)',
+          }}
+          aria-hidden="true"
+        />
+
+        <div className="relative flex items-center gap-5">
+          {/* Logo with pulsing brand-ring spinner */}
+          <div className="relative h-16 w-16 flex-shrink-0">
+            <div
+              className="absolute inset-0 rounded-2xl border-2 border-white/40 border-t-white"
+              style={{ animation: 'spin 1.4s linear infinite' }}
+            />
+            <div
+              className="absolute inset-1 rounded-xl bg-white/95 flex items-center justify-center shadow-md"
+            >
+              <img src="/logo-icon.png" alt="" className="h-9 w-9" />
+            </div>
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="text-[11px] uppercase tracking-[0.22em] text-brand-100/90 font-semibold mb-1">
+              LexClause is working
+            </div>
+            <h2 className="font-serif-brand text-3xl uppercase tracking-tight leading-none">
+              <span className="lc-title-underline">Analyzing</span>
+            </h2>
+            <p
+              className="text-brand-50/95 text-sm mt-3 tracking-wide"
+              style={{ fontVariant: 'all-small-caps' }}
+            >
+              Reading allegations, parsing policy terms, and assembling the trigger / priority / exhaustion opinion. Usually 30–90 seconds.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Progress steps */}
+      <div className="bg-white p-6">
+        <ol className="space-y-2.5">
+          {steps.map((label, i) => {
+            const status = i < activeStep ? 'done' : i === activeStep ? 'active' : 'pending'
+            return (
+              <li key={i} className="flex items-center gap-3 text-sm">
+                {status === 'done' && (
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-600 text-white flex-shrink-0">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </span>
+                )}
+                {status === 'active' && (
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex-shrink-0 ring-2 ring-brand-300/60">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  </span>
+                )}
+                {status === 'pending' && (
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex-shrink-0">
+                    <span className="block w-2 h-2 rounded-full bg-slate-300" />
+                  </span>
+                )}
+                <span
+                  className={
+                    status === 'done'    ? 'text-slate-500 line-through decoration-brand-300 decoration-2' :
+                    status === 'active'  ? 'text-slate-900 font-medium' :
+                                           'text-slate-400'
+                  }
+                  style={status === 'active' ? { fontVariant: 'all-small-caps', letterSpacing: '0.04em' } : undefined}
+                >
+                  {label}
+                </span>
+                {status === 'active' && (
+                  <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-brand-700 font-semibold">
+                    <span className="block w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
+                    in progress
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ol>
+
+        <div className="mt-6 pt-5 border-t border-brand-100 flex items-center gap-3 text-xs">
+          <span className="font-serif-brand text-brand-700 tracking-wider">LexClause</span>
+          <span className="text-slate-300">·</span>
+          <span
+            className="text-slate-500 tracking-wide"
+            style={{ fontVariant: 'all-small-caps' }}
+          >
+            Citations drawn only from the curated catalog
+          </span>
         </div>
       </div>
     </div>
