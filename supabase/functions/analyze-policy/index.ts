@@ -426,20 +426,49 @@ async function callClaude({ system, userContent, max_tokens = 4096 }) {
 }
 
 async function callClaudeMessages(system, messages, max_tokens = 4096) {
-  const r = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type':      'application/json',
-      'x-api-key':         ANTHROPIC_API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens, system, messages }),
-  })
-  if (!r.ok) {
-    const errText = await r.text()
-    throw new Error(`Anthropic ${r.status}: ${errText.slice(0, 500)}`)
+  // Retry with exponential backoff for transient errors (429 rate-limit, 5XX
+  // overloaded/timeout). Real 4XX errors (auth, bad request) bubble up
+  // immediately. Up to 4 attempts total: 0s, 1s, 3s, 7s.
+  const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529])
+  const MAX_ATTEMPTS = 4
+  let lastErr = null
+
+  for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+    if (attempt > 0) {
+      const delayMs = (Math.pow(2, attempt) - 1) * 1000  // 1s, 3s, 7s
+      await new Promise(res => setTimeout(res, delayMs))
+    }
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type':      'application/json',
+          'x-api-key':         ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+        },
+        body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens, system, messages }),
+      })
+      if (r.ok) return await r.json()
+
+      const errText = await r.text()
+      const errMsg  = `Anthropic ${r.status}: ${errText.slice(0, 500)}`
+      if (RETRYABLE_STATUSES.has(r.status) && attempt < MAX_ATTEMPTS - 1) {
+        lastErr = new Error(errMsg)
+        continue  // retry
+      }
+      throw new Error(errMsg)  // non-retryable, or final attempt
+    } catch (e) {
+      // Network errors are retryable too (DNS, connection reset, etc.)
+      const msg = String(e?.message || e)
+      const isNetwork = !msg.startsWith('Anthropic ')  // our own throws start with "Anthropic"
+      if (isNetwork && attempt < MAX_ATTEMPTS - 1) {
+        lastErr = e
+        continue
+      }
+      throw e
+    }
   }
-  return await r.json()
+  throw lastErr || new Error('Anthropic call failed after retries')
 }
 
 // ── Allocation validator ────────────────────────────────────────────────────
