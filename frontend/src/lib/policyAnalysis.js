@@ -67,6 +67,59 @@ export async function runComparison(matterId, states, opts = {}) {
   return data
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// v0.3 — coverage priority engine
+// ────────────────────────────────────────────────────────────────────────────
+
+/** Auto-classify an uploaded PDF. Returns { kind, policy_form, venue_state, confidence, summary }. */
+export async function classifyDocument(storagePath, bucket = 'lc-matter-docs') {
+  const { data, error } = await supabase.functions.invoke('analyze-policy', {
+    body: { mode: 'classify_document', storagePath, bucket },
+  })
+  if (error) throw error
+  return data?.parsed
+}
+
+/** Extract structured allegations from a complaint / demand / ROR / claim summary.
+ *  If `matterId` is provided, the engine writes allegations + facts back to lc_matters.
+ */
+export async function extractAllegations(storagePath, matterId = null) {
+  const { data, error } = await supabase.functions.invoke('analyze-policy', {
+    body: { mode: 'extract_allegations', storagePath, matterId },
+  })
+  if (error) throw error
+  return data?.parsed
+}
+
+/** Run the coverage_priority engine for a matter. Returns { analysisId, status }. */
+export async function runCoveragePriority(matterId, opts = {}) {
+  const { data, error } = await supabase.functions.invoke('analyze-policy', {
+    body: {
+      mode: 'coverage_priority',
+      matterId,
+      governingStateOverride: opts.governingState || null,
+    },
+  })
+  if (error) throw error
+  return data
+}
+
+/** Run coverage_priority across multiple states in parallel. Returns { comparisonGroupId, analysisIds }. */
+export async function runCoveragePriorityComparison(matterId, states) {
+  if (!Array.isArray(states) || states.length < 2) {
+    throw new Error('runCoveragePriorityComparison requires at least 2 states')
+  }
+  const { data, error } = await supabase.functions.invoke('analyze-policy', {
+    body: {
+      mode: 'coverage_priority',
+      matterId,
+      comparisonStates: states,
+    },
+  })
+  if (error) throw error
+  return data
+}
+
 /**
  * What we expect Claude to extract from each policy. Documented here so the
  * Edge Function prompt + the database column shapes can stay in sync.
