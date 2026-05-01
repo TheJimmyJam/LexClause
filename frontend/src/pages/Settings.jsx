@@ -9,14 +9,18 @@
  * Profile tab is the default.
  */
 
-import { useEffect, useMemo } from 'react'
-import { useSearchParams, Link } from 'react-router-dom'
-import { User, Building2, Users, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams, Link, useNavigate } from 'react-router-dom'
+import { User, Building2, Users, Sparkles, Plus, X, Loader2, Shield, Mail } from 'lucide-react'
+import toast from 'react-hot-toast'
+import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
 import TeamPanel from '../components/TeamPanel.jsx'
 
+const APP_URL = (typeof window !== 'undefined' && window.location.origin) || 'https://lexclause.netlify.app'
+
 export default function Settings() {
-  const { profile, user } = useAuth()
+  const { profile, user, isSuperAdmin } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const [params, setParams] = useSearchParams()
 
@@ -107,7 +111,7 @@ export default function Settings() {
         <ProfilePanel user={user} profile={profile} />
       )}
       {tab === 'organization' && (
-        <OrgPanel profile={profile} />
+        <OrgPanel profile={profile} isSuperAdmin={isSuperAdmin} />
       )}
       {tab === 'team' && (
         <TeamPanel />
@@ -134,19 +138,182 @@ function ProfilePanel({ user, profile }) {
   )
 }
 
-function OrgPanel({ profile }) {
+function OrgPanel({ profile, isSuperAdmin }) {
+  const [createOpen, setCreateOpen] = useState(false)
+
   return (
-    <div className="card p-6">
-      <h2 className="font-semibold text-slate-900 mb-4 text-sm uppercase tracking-wider">Organization</h2>
-      <div className="grid sm:grid-cols-2 gap-4 text-sm">
-        <Field label="Organization" value={profile?.organization?.name} />
-        <Field label="Organization ID" value={profile?.org_id} mono />
-        <Field label="Your role" value={profile?.role} />
+    <>
+      <div className="card p-6">
+        <h2 className="font-semibold text-slate-900 mb-4 text-sm uppercase tracking-wider">Your organization</h2>
+        <div className="grid sm:grid-cols-2 gap-4 text-sm">
+          <Field label="Organization"     value={profile?.organization?.name} />
+          <Field label="Organization ID"  value={profile?.org_id} mono />
+          <Field label="Your role"        value={profile?.role} />
+        </div>
+        <p className="text-xs text-slate-400 mt-6 italic">
+          Coverage matters, policies, and analyses are scoped to this organization. Anyone added through the{' '}
+          <em>Team</em> tab can see everything in this org.
+        </p>
       </div>
-      <p className="text-xs text-slate-400 mt-6 italic">
-        Coverage matters, policies, and analyses are scoped to this organization. Anyone added through the{' '}
-        <em>Team</em> tab can see everything in this org.
-      </p>
+
+      {/* Super-admin only — provision a new customer organization */}
+      {isSuperAdmin && (
+        <div className="card p-6 mt-5 border-amber-200 bg-amber-50/40">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div>
+              <h2 className="font-semibold text-amber-900 mb-1 text-sm uppercase tracking-wider flex items-center gap-2">
+                <Shield className="h-4 w-4" /> God-mode · provision new org
+              </h2>
+              <p className="text-xs text-amber-800/90 leading-relaxed">
+                Create a brand-new customer organization (a separate firm) and invite their first admin.
+                The new org's data is fully isolated from yours by RLS — you'll only see it via{' '}
+                <Link to="/admin" className="underline font-medium">/admin</Link>.
+              </p>
+            </div>
+            <button
+              onClick={() => setCreateOpen(true)}
+              className="btn-primary flex-shrink-0"
+              style={{ fontVariant: 'all-small-caps' }}
+            >
+              <Plus className="h-4 w-4" /> New organization
+            </button>
+          </div>
+        </div>
+      )}
+
+      {createOpen && <NewOrgModal onClose={() => setCreateOpen(false)} />}
+    </>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// NewOrgModal — super admins provision a fresh customer org and invite the
+// first admin in one step. Inserts lc_organizations row (RLS allows it for
+// super admins via the additive "lc_super_admin all" policy from migration
+// 018), then fires team-invite with target_org_id.
+// ──────────────────────────────────────────────────────────────────────────
+function NewOrgModal({ onClose }) {
+  const navigate = useNavigate()
+  const [name,  setName]  = useState('')
+  const [email, setEmail] = useState('')
+  const [busy,  setBusy]  = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!name.trim() || !email.trim() || busy) return
+    setBusy(true)
+    try {
+      // 1. Create the new org (super admin RLS allows the insert)
+      const { data: org, error: orgErr } = await supabase
+        .from('lc_organizations')
+        .insert({ name: name.trim() })
+        .select()
+        .single()
+      if (orgErr || !org) throw new Error(orgErr?.message || 'Could not create organization')
+
+      // 2. Invite the first admin into the new org via the existing edge function
+      const { data: inv, error: invErr } = await supabase.functions.invoke('team-invite', {
+        body: {
+          email:         email.trim().toLowerCase(),
+          role:          'admin',
+          app_url:       APP_URL,
+          target_org_id: org.id,
+        },
+      })
+      if (invErr) throw invErr
+      if (inv?.error) throw new Error(inv.error)
+
+      const sent = inv?.email_sent
+      toast.success(
+        sent
+          ? `Created ${org.name} and emailed admin invite to ${email.trim()}`
+          : `Created ${org.name} (invite created — email status: ${inv?.send_error?.slice(0, 100) || 'unknown'})`
+      )
+      onClose()
+      navigate('/admin')
+    } catch (e) {
+      toast.error(e?.message || 'Could not create organization')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl shadow-2xl shadow-brand-900/40 overflow-hidden bg-white"
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="h-1.5"
+          style={{ background: 'linear-gradient(90deg, var(--brand-700), var(--brand-500), var(--brand-300))' }}
+          aria-hidden="true"
+        />
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <div>
+              <div className="text-[11px] font-semibold tracking-[0.22em] uppercase text-amber-700 mb-1 inline-flex items-center gap-1.5">
+                <Shield className="h-3 w-3" />
+                God-mode
+              </div>
+              <h2 className="font-serif-brand text-2xl uppercase tracking-tight text-slate-900 leading-none">
+                New organization
+              </h2>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 -mr-1 -mt-1">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-500 mt-3 mb-5 leading-relaxed">
+            Provisions a brand-new customer organization and emails the first admin a signup link.
+            The new org's data is fully isolated by RLS — you can manage it from{' '}
+            <span className="text-brand-700 font-semibold">/admin</span>.
+          </p>
+
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <label className="form-label">Organization name</label>
+              <input
+                type="text" required autoFocus
+                placeholder="e.g. Smith &amp; Wesson LLP"
+                className="form-input"
+                value={name}
+                onChange={e => setName(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">First admin email</label>
+              <input
+                type="email" required
+                placeholder="admin@firm.com"
+                className="form-input"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+              <p className="text-[11px] text-slate-500 mt-1">
+                They'll receive an invite email and become the org's first admin when they accept.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+              <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+              <button
+                type="submit"
+                disabled={busy || !name.trim() || !email.trim()}
+                className="btn-primary"
+                style={{ fontVariant: 'all-small-caps' }}
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                {busy ? 'Creating…' : 'Create &amp; invite admin'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   )
 }
