@@ -106,7 +106,14 @@ export default function Register() {
                   Coverage opinions it generates are draft work product to assist coverage counsel —
                   they are <strong>not legal advice</strong> and do not substitute for independent professional
                   judgment. I will independently verify all citations, conclusions, and policy
-                  interpretations before relying on them.
+                  interpretations before relying on them. By creating an account I agree to the{' '}
+                  <Link to="/terms" target="_blank" className="text-brand-700 hover:text-brand-800 underline font-semibold">
+                    Terms of Service
+                  </Link>{' '}
+                  and{' '}
+                  <Link to="/privacy" target="_blank" className="text-brand-700 hover:text-brand-800 underline font-semibold">
+                    Privacy Policy
+                  </Link>.
                 </span>
               </label>
               {errors.disclaimer && (
