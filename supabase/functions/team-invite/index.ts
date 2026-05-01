@@ -111,11 +111,13 @@ serve(async (req) => {
     // caller's org and the inviter's name).
     const admin = createClient(SUPABASE_URL, SERVICE_KEY)
 
-    // Resolve the caller from the supplied JWT
-    const userClient = createClient(SUPABASE_URL, SERVICE_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    })
-    const { data: userResp, error: userErr } = await userClient.auth.getUser()
+    // Resolve the caller from the supplied JWT. We pass the JWT explicitly to
+    // getUser() rather than relying on session detection — the admin client
+    // doesn't carry a session, so getUser() with no args returns null even
+    // when a valid Bearer token is present.
+    const jwt = authHeader.replace(/^Bearer\s+/i, '').trim()
+    if (!jwt) throw new Error('Authentication required')
+    const { data: userResp, error: userErr } = await admin.auth.getUser(jwt)
     if (userErr || !userResp?.user) throw new Error('Could not identify the caller')
     const callerId = userResp.user.id
 
