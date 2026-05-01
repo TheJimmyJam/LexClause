@@ -19,6 +19,7 @@ import { useDropzone } from 'react-dropzone'
 import {
   Upload, FileText, Loader2, CheckCircle2, AlertTriangle, X, XCircle,
   Sparkles, ScrollText, Scale, Shield, ChevronDown, Plus, Search,
+  Download, FileType,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase.js'
@@ -30,6 +31,7 @@ import {
   runCoveragePriority,
   runCoveragePriorityComparison,
 } from '../lib/policyAnalysis.js'
+import { downloadMemoDocx, downloadMemoPdf } from '../lib/generateCoverageMemo.js'
 
 const ALL_STATES = [
   'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME',
@@ -844,10 +846,13 @@ function ResultView({ analysis, comparison, comparisonGroupId, onReset }) {
 }
 
 function SingleStateResult({ analysis, onReset }) {
+  const { profile } = useAuth()
   const results = (analysis.lc_analysis_results || []).slice().sort((a, b) => (a.ordering ?? 0) - (b.ordering ?? 0))
   const triggered = results.filter(r => r.triggered === 'yes' || r.triggered === 'partial')
   const notTriggered = results.filter(r => r.triggered === 'no')
   const matterName = analysis.lc_matters?.name
+  const matter = analysis.lc_matters || { name: matterName, governing_state: analysis.governing_state }
+  const exportPayload = { analysis, matter, results, organization: profile?.organization }
 
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto">
@@ -867,9 +872,12 @@ function SingleStateResult({ analysis, onReset }) {
               <span className="text-xs text-slate-500 tracking-wide">Coverage priority opinion</span>
             </div>
           </div>
-          <button onClick={onReset} className="btn-secondary">
-            <Plus className="h-4 w-4" /> New analysis
-          </button>
+          <div className="flex items-center gap-2">
+            <ExportMenu payload={exportPayload} />
+            <button onClick={onReset} className="btn-secondary">
+              <Plus className="h-4 w-4" /> New analysis
+            </button>
+          </div>
         </div>
 
         <h1 className="font-serif-brand text-4xl lg:text-5xl tracking-tight text-slate-900 leading-none">
@@ -1093,6 +1101,73 @@ function ComparisonResult({ comparison, onReset }) {
       <footer className="mt-12 pt-6 border-t border-brand-100/80 text-center text-xs text-slate-400">
         <span className="font-serif-brand text-brand-700 tracking-wider">LexClause</span> · Coverage priority engine · Citations drawn only from the curated catalog
       </footer>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// ExportMenu — download the opinion as .docx or .pdf
+// ──────────────────────────────────────────────────────────────────────────
+function ExportMenu({ payload }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  const exportAs = async (format) => {
+    if (busy) return
+    setBusy(true); setOpen(false)
+    try {
+      if (format === 'docx') await downloadMemoDocx(payload)
+      else                     downloadMemoPdf(payload)
+      toast.success(`Opinion exported as ${format.toUpperCase()}`)
+    } catch (e) {
+      console.error('Export failed', e)
+      toast.error(e?.message || 'Export failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        disabled={busy}
+        className="btn-primary"
+      >
+        <Download className="h-4 w-4" />
+        {busy ? 'Generating…' : 'Export opinion'}
+        <ChevronDown className="h-3.5 w-3.5 -mr-1 opacity-80" />
+      </button>
+      {open && (
+        <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-modal z-30 overflow-hidden">
+          <button
+            onClick={() => exportAs('docx')}
+            className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-brand-50 text-left"
+          >
+            <FileText className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+            <div>
+              <div className="text-sm font-medium text-slate-900">Word (.docx)</div>
+              <div className="text-xs text-slate-500">Editable for further drafting</div>
+            </div>
+          </button>
+          <button
+            onClick={() => exportAs('pdf')}
+            className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-brand-50 text-left border-t border-slate-100"
+          >
+            <FileType className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+            <div>
+              <div className="text-sm font-medium text-slate-900">PDF</div>
+              <div className="text-xs text-slate-500">Finalized for filing or distribution</div>
+            </div>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
