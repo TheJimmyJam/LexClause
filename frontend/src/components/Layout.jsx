@@ -3,13 +3,14 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import {
   LayoutDashboard, FileText, FolderOpen, Settings, LogOut,
-  Menu, X, Moon, Sun, Sparkles, History,
+  Menu, X, Moon, Sun, Sparkles, History, Users,
 } from 'lucide-react'
 import { useState } from 'react'
 
 const navItems = [
   { to: '/analyze',   icon: Sparkles,        label: 'New analysis', primary: true },
   { to: '/matters',   icon: History,         label: 'Past matters' },
+  { to: '/team',      icon: Users,           label: 'Team' },
 ]
 
 export default function Layout() {
