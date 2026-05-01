@@ -449,39 +449,39 @@ export default function Analyzer() {
   }
 
   return (
-    <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+    <div className="px-6 pt-4 pb-6 lg:px-10 lg:pt-6 lg:pb-10 max-w-4xl mx-auto">
       {/* ── Header: logo lockup + serif title with brand underline ─────── */}
-      <header className="mb-10">
-        <div className="flex items-center gap-4 mb-5">
+      <header className="mb-5">
+        <div className="flex items-center gap-3 mb-3">
           <img
             src="/logo-icon.png"
             alt="LexClause"
-            className="h-14 w-14 rounded-xl ring-1 ring-brand-200/70 shadow-sm bg-white p-1"
+            className="h-10 w-10 rounded-lg ring-1 ring-brand-200/70 shadow-sm bg-white p-0.5"
           />
           <div className="flex flex-col">
-            <span className="text-[11px] font-semibold tracking-[0.22em] uppercase text-brand-700">
+            <span className="text-[10px] font-semibold tracking-[0.22em] uppercase text-brand-700 leading-tight">
               LexClause
             </span>
-            <span className="text-xs text-slate-500 tracking-wide">Coverage priority engine</span>
+            <span className="text-[11px] text-slate-500 tracking-wide leading-tight">Coverage priority engine</span>
           </div>
         </div>
 
-        <h1 className="font-serif-brand text-5xl lg:text-6xl tracking-tight text-slate-900 leading-none">
-          <span className="lc-title-underline uppercase">Coverage Priority</span>
-          <br />
-          <span className="text-slate-700">Analysis</span>
-        </h1>
-
-        <p
-          className="text-slate-600 mt-7 text-lg max-w-2xl leading-relaxed tracking-wide"
-          style={{ fontVariant: 'all-small-caps' }}
-        >
-          Drop your policies and the lawsuit. Get a citable{' '}
-          <strong className="text-brand-700">Trigger</strong> /{' '}
-          <strong className="text-brand-700">Priority</strong> /{' '}
-          <strong className="text-brand-700">Exhaustion</strong>{' '}
-          opinion under the controlling state's law.
-        </p>
+        <div className="flex items-end justify-between gap-4 flex-wrap">
+          <h1 className="font-serif-brand text-3xl lg:text-4xl tracking-tight text-slate-900 leading-none">
+            <span className="lc-title-underline uppercase">Coverage Priority</span>{' '}
+            <span className="text-slate-700">Analysis</span>
+          </h1>
+          <p
+            className="text-slate-600 text-sm tracking-wide max-w-md text-right"
+            style={{ fontVariant: 'all-small-caps' }}
+          >
+            Drop policies + lawsuit · get a citable{' '}
+            <strong className="text-brand-700">Trigger</strong> /{' '}
+            <strong className="text-brand-700">Priority</strong> /{' '}
+            <strong className="text-brand-700">Exhaustion</strong>{' '}
+            opinion.
+          </p>
+        </div>
       </header>
 
       {/* ── Drop zone: marching alternating dashes + white-over-blue split fill ── */}
@@ -494,8 +494,8 @@ export default function Analyzer() {
 
       {/* Files */}
       {files.length > 0 && (
-        <div className="space-y-3 mb-8">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="space-y-2 mb-4">
+          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
             Files ({files.length})
           </h2>
           {files.map(f => (
@@ -516,34 +516,34 @@ export default function Analyzer() {
 
       {/* Controls panel — appears once at least one of each */}
       {policyFiles.length >= 1 && triggerFile && (
-        <div className="card p-6 mb-6 bg-gradient-to-br from-brand-50/40 to-cyan-50/30 border-brand-200/60">
-          <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <div className="card p-4 mb-4 bg-gradient-to-br from-brand-50/40 to-cyan-50/30 border-brand-200/60">
+          <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm">
             <Sparkles className="h-4 w-4 text-brand-600" />
             Ready to analyze
           </h2>
 
-          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+          <div className="grid sm:grid-cols-2 gap-3 mb-3">
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
                 Governing state
               </label>
               <select
                 value={governingState}
                 onChange={(e) => setGoverningState(e.target.value)}
                 disabled={phase !== 'input'}
-                className="form-select w-full"
+                className="form-select w-full text-sm"
               >
                 <option value="">— Select state —</option>
                 {ALL_STATES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
               {triggerFile?.classification?.venue_state && triggerFile.classification.venue_state !== governingState && (
-                <p className="text-xs text-slate-500 mt-1">Venue detected in {triggerFile.classification.venue_state}</p>
+                <p className="text-[10px] text-slate-500 mt-0.5">Venue detected in {triggerFile.classification.venue_state}</p>
               )}
             </div>
 
             <div>
-              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-                Compare under additional states (optional)
+              <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
+                Compare additional states (optional)
               </label>
               <MultiStateSelector
                 states={comparisonStates}
@@ -554,8 +554,8 @@ export default function Analyzer() {
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-brand-200/60 pt-4">
-            <div className="text-xs text-slate-600">
+          <div className="flex items-center justify-between border-t border-brand-200/60 pt-3">
+            <div className="text-[11px] text-slate-600">
               <strong>{policyFiles.length}</strong> polic{policyFiles.length === 1 ? 'y' : 'ies'} ·{' '}
               <strong>1</strong> trigger doc{otherFiles.length > 0 ? ` · ${otherFiles.length} other` : ''}
               {comparisonStates.length > 0 && ` · compare ${comparisonStates.length + 1} states`}
@@ -670,23 +670,23 @@ function DropZone({ getRootProps, getInputProps, isDragActive, phase }) {
           background: 'linear-gradient(to bottom, #ffffff 0%, #ffffff 50%, var(--brand-100) 50%, var(--brand-50) 100%)',
         }}
       >
-        <div className="px-8 py-12">
-          <div className="mx-auto flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md ring-1 ring-brand-200/70 mb-5">
-            <img src="/logo-icon.png" alt="" className="h-12 w-12" />
+        <div className="px-6 py-7">
+          <div className="mx-auto flex items-center justify-center w-14 h-14 rounded-xl bg-white shadow-md ring-1 ring-brand-200/70 mb-3">
+            <img src="/logo-icon.png" alt="" className="h-9 w-9" />
           </div>
           <p
-            className="text-slate-900 font-semibold text-lg tracking-wide"
+            className="text-slate-900 font-semibold text-base tracking-wide"
             style={{ fontVariant: 'all-small-caps' }}
           >
             {isDragActive ? 'Release to upload…' : 'Drop policies + lawsuit here'}
           </p>
           <p
-            className="text-slate-600 text-sm mt-1 tracking-wide"
+            className="text-slate-600 text-xs mt-0.5 tracking-wide"
             style={{ fontVariant: 'all-small-caps' }}
           >
             or click anywhere in this box to browse
           </p>
-          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider text-brand-800/80 font-medium">
+          <div className="mt-3 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[10px] uppercase tracking-wider text-brand-800/80 font-medium">
             <span>CGL</span><span className="text-brand-400">·</span>
             <span>Pollution</span><span className="text-brand-400">·</span>
             <span>Professional</span><span className="text-brand-400">·</span>
