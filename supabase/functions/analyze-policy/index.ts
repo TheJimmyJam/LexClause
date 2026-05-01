@@ -191,6 +191,142 @@ Rules:
 - description: factual summary only. No legal conclusions.
 - Output MUST be valid JSON — nothing else.`
 
+// ────────────────────────────────────────────────────────────────────────────
+// COVERAGE PRIORITY ENGINE
+// ────────────────────────────────────────────────────────────────────────────
+// Replaces the old ALLOCATE_SYSTEM prompt for new analyses (mode='coverage_priority').
+// Produces a three-section legal opinion (Trigger / Priority / Exhaustion) plus a
+// 2-3 paragraph narrative. Does NOT allocate dollars — answers the threshold
+// legal question of which policies are triggered and in what priority order they
+// respond, under the controlling state's law.
+//
+// Ground truth comes from lc_state_law_rules with separated narratives + citation
+// arrays per dimension (trigger / priority / exhaustion). Citation discipline is
+// strict: the engine is forbidden from inventing case names and is pinned to the
+// catalog. Validation is structural (every policy gets a trigger entry, priority
+// only includes triggered policies, citations come from the catalog).
+const COVERAGE_PRIORITY_SYSTEM = `You are a senior coverage attorney producing a defensible coverage-priority opinion for a single matter. Your output drives a downstream legal work product, so it must be precise, conservative, and citable. Do not invent law. Do not overstate certainty. If a piece of authority is not in the supplied catalog, say so plainly rather than fabricate it.
+
+You will receive ONE JSON payload with three top-level objects:
+
+- matter — the underlying claim. Includes:
+  - name, description, loss_type
+  - loss_start_date, loss_end_date
+  - venue_state, governing_state
+  - allegations — array of {count, theory_of_liability, conduct_alleged, harm_type} extracted from the underlying complaint, petition, pre-suit demand, ROR, or claim summary
+- policies — array of N policies, each already extracted with: id, carrier, policy_number, effective_date, expiration_date, state_issued, policy_form (CGL_OCCURRENCE | CGL_CLAIMS_MADE | UMBRELLA | EXCESS | PROFESSIONAL | POLLUTION_CONTRACTOR | POLLUTION_SITE | BUILDERS_RISK | D&O | OTHER), per_occurrence_limit, general_aggregate, self_insured_retention, attachment_point, other_insurance_clause (verbatim, may be null if silent), other_insurance_type (PRIMARY | EXCESS | PRO_RATA | ESCAPE | EXCESS_OVER_OTHER | SILENT), endorsements (with effect: BROADENS | RESTRICTS | NEUTRAL), exclusions, and key flags (has_anti_stacking_clause, has_non_cumulation_clause, has_continuous_trigger_endorsement, etc.)
+- state_rule — the controlling state's rules with vetted citations:
+  - state_code, name
+  - trigger_test (e.g. "eight-corners rule", "four-corners rule", "potentiality of coverage with extrinsic evidence")
+  - trigger_citations — array of strings; ONLY use these for trigger authority
+  - priority_rule (e.g. "gives effect to plain policy language; competing excess clauses prorate by limits when mutually repugnant")
+  - priority_citations — array of strings; ONLY use these for priority authority
+  - exhaustion_rule_text ("vertical" | "horizontal" | "mixed" | "undetermined")
+  - exhaustion_citations — array of strings; ONLY use these for exhaustion authority
+
+ANALYZE in this order.
+
+STEP 1 — TRIGGER (duty-to-defend layer).
+For EACH policy in policies, apply the state's trigger_test to the matter's allegations. Decide:
+- triggered: "yes" if EVERY implicating allegation potentially falls within the policy's coverage grant and is not barred by an applicable exclusion (or if there is only one allegation and it is covered).
+- triggered: "no" if NO allegation survives the coverage analysis. This includes BOTH situations where (a) no allegation falls within the coverage grant, AND (b) every allegation that does is then barred by an applicable exclusion. If you conclude a clear exclusion bars every implicating allegation, the answer is "no" — do NOT mark it "partial" because the coverage grant was nominally implicated. The exclusion analysis is part of the trigger answer.
+- triggered: "partial" ONLY if there is a genuine mixed-claim situation — at least one allegation is covered AND at least one allegation is not covered (whether because it falls outside the grant or because a different exclusion bars it). Do not use "partial" as a hedge.
+
+Quote or near-quote the specific allegations driving the answer. Quote the specific coverage grant or exclusion that drives the answer. Be concrete.
+
+A claims-made policy is only triggered if the claim was first made during the policy period (or extended reporting period). An occurrence-based policy is triggered if the bodily injury or property damage occurred during the policy period.
+
+STEP 2 — PRIORITY (Other Insurance / primary-vs-excess layer).
+Among policies where triggered != "no", rank in order of responsibility:
+- "primary" — first responder; its limits exhaust first.
+- "co-primary" — multiple policies share the primary layer.
+- "excess" — attaches above primary.
+- "sub-excess" — attaches above excess.
+
+To rank:
+a. Pull each triggered policy's other_insurance_clause (verbatim) and other_insurance_type.
+b. Apply these general principles, layered with state_rule.priority_rule:
+   - SILENT or PRIMARY → defaults to primary.
+   - EXCESS or EXCESS_OVER_OTHER on one + SILENT/PRIMARY on another → SILENT/PRIMARY is primary; EXCESS is excess.
+   - EXCESS on TWO OR MORE → potentially mutually repugnant; apply state's tiebreaker (often pro-rata by limits, equal shares, specific-over-general, or closest-to-the-risk).
+   - PRO_RATA + EXCESS → most states give effect to the EXCESS clause; PRO_RATA is primary.
+   - ESCAPE clauses are disfavored; treat with caution.
+c. Consider policy_form: a CGL is generally primary to UMBRELLA/EXCESS forms regardless of Other Insurance clauses, because umbrella/excess attach at attachment_point. Pollution-specific policies (POLLUTION_CONTRACTOR, POLLUTION_SITE) often serve as primary for pollution losses where a CGL pollution exclusion bars the CGL.
+d. Consider endorsements: "Primary and Non-Contributory" requires a written contract on an additional insured to fire.
+e. State the controlling priority rule with a citation drawn ONLY from state_rule.priority_citations.
+
+Group mutually-repugnant policies with the default rule that kicks in.
+
+STEP 3 — EXHAUSTION.
+State the controlling exhaustion rule with a citation drawn ONLY from state_rule.exhaustion_citations. Explain how it interacts with this specific tower.
+- vertical: an excess attaches once the directly-underlying primary is exhausted, regardless of other co-primaries.
+- horizontal: ALL primaries across all triggered years must exhaust before any excess attaches.
+- mixed: turns on policy language or specific facts.
+
+STEP 4 — NARRATIVE.
+2-3 paragraphs of opinion-style prose. Walk through allegations -> triggered policies -> priority order -> exhaustion rule. Use the same citations you used in the structured fields. Do not introduce new authority.
+
+OUTPUT — ONE JSON OBJECT, no prose, no markdown:
+
+{
+  "trigger_analysis": [
+    {
+      "policy_id": string,
+      "carrier": string,
+      "policy_number": string,
+      "policy_form": string,
+      "triggered": "yes" | "no" | "partial",
+      "allegations_implicating_coverage": [string],
+      "coverage_grant_basis": string,
+      "exclusions_considered": [
+        { "label": string, "applies": boolean, "rationale": string }
+      ],
+      "rationale": string
+    }
+  ],
+  "priority_analysis": {
+    "ordered_policies": [
+      {
+        "policy_id": string,
+        "carrier": string,
+        "policy_number": string,
+        "rank": "primary" | "co-primary" | "excess" | "sub-excess",
+        "rank_basis": string,
+        "other_insurance_quote": string,
+        "other_insurance_type": string
+      }
+    ],
+    "mutually_repugnant_groups": [
+      {
+        "policy_ids": [string],
+        "reason": string,
+        "default_rule": string
+      }
+    ],
+    "rule_applied": string,
+    "rule_citation": string
+  },
+  "exhaustion_analysis": {
+    "rule": "vertical" | "horizontal" | "mixed" | "undetermined",
+    "rationale": string,
+    "rule_citation": string
+  },
+  "narrative": string
+}
+
+CITATION RULES — STRICT.
+- The state_rule object contains three citation arrays: trigger_citations, priority_citations, exhaustion_citations.
+- Use ONLY citations from those arrays, and use them in the SECTION they belong to. Do not cross-cite.
+- Do NOT invent case names, reporter cites, court names, or years from training data. Coverage law is the kind of legal area where misciting is malpractice.
+- If a section's citation array is empty or missing, write the doctrine in general terms and explicitly say "no citation in catalog for this point."
+
+INVARIANTS (verify before returning).
+- Every policy in input.policies has exactly one entry in trigger_analysis.
+- priority_analysis.ordered_policies contains only policies with triggered != "no".
+- Every cited authority in priority_analysis.rule_citation appears in state_rule.priority_citations.
+- Every cited authority in exhaustion_analysis.rule_citation appears in state_rule.exhaustion_citations.
+- Output is valid JSON. No prose, no markdown fences.`
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 async function downloadAsBase64(supabase, bucket, storagePath) {
   const { data, error } = await supabase.storage.from(bucket).download(storagePath)
@@ -340,6 +476,141 @@ function validateAllocation(parsed, matter, policies) {
 function buildRetryMessage(errors, exposure) {
   const lines = errors.map((e, i) => `  ${i + 1}. ${e.message}`).join('\n')
   return `Your previous answer failed the post-validation checks. Specifically:\n\n${lines}\n\nRules of correction:\n- Total of allocated_amount + insured_retention MUST equal $${exposure.toLocaleString()} exactly.\n- No allocated_amount may exceed its policy's per-occurrence limit.\n- Sum of share_pct + insured_retention/damages_exposure MUST equal 1.0000 (within 0.01).\n- Keep the same allocation_method and trigger_theory unless you now believe a different rule applies.\n- Return the FULL corrected JSON object — same shape as before. No prose, no markdown.`
+}
+
+// ── Coverage-priority validator ─────────────────────────────────────────────
+// Structural validation for coverage_priority mode output. Checks that every
+// policy has a trigger entry, that priority ranking only includes triggered
+// policies, and that cited authorities trace back to the supplied catalog.
+// Returns an array of error objects; empty array means valid.
+function validateCoveragePriority(parsed, _matter, policies, stateRule) {
+  const errors = []
+
+  // 1. Top-level structure
+  for (const k of ['trigger_analysis', 'priority_analysis', 'exhaustion_analysis', 'narrative']) {
+    if (!(k in parsed)) {
+      errors.push({ type: 'missing_top_level', message: `Output is missing required top-level key "${k}". Add it.` })
+    }
+  }
+
+  const trigList = Array.isArray(parsed.trigger_analysis) ? parsed.trigger_analysis : []
+  const priority = parsed.priority_analysis || {}
+  const ordered  = Array.isArray(priority.ordered_policies) ? priority.ordered_policies : []
+
+  // 2. Every input policy has exactly one trigger entry
+  const polIds   = new Set(policies.map((p) => p.id))
+  const trigIds  = new Set(trigList.map((t) => t && t.policy_id).filter(Boolean))
+  const missing  = [...polIds].filter((id) => !trigIds.has(id))
+  if (missing.length > 0) {
+    errors.push({
+      type: 'trigger_missing_policies',
+      message: `trigger_analysis is missing entries for policies: ${missing.join(', ')}. Add one entry per input policy.`,
+    })
+  }
+  // Reject duplicate trigger entries for the same policy
+  const seen = new Map()
+  for (const t of trigList) {
+    if (!t || !t.policy_id) continue
+    seen.set(t.policy_id, (seen.get(t.policy_id) || 0) + 1)
+  }
+  for (const [pid, n] of seen) {
+    if (n > 1) {
+      errors.push({
+        type: 'trigger_duplicate_policy',
+        message: `policy_id ${pid} appears ${n} times in trigger_analysis — should appear exactly once.`,
+      })
+    }
+  }
+
+  // 3. priority_analysis.ordered_policies contains only triggered != "no" policies
+  const triggeredYesOrPartial = new Set(
+    trigList.filter((t) => t.triggered === 'yes' || t.triggered === 'partial').map((t) => t.policy_id)
+  )
+  for (const row of ordered) {
+    if (!triggeredYesOrPartial.has(row.policy_id)) {
+      errors.push({
+        type: 'priority_includes_untriggered',
+        message: `Policy ${row.policy_id} (${row.carrier}, ${row.policy_number}) is in priority_analysis.ordered_policies but its trigger_analysis entry is "no". Drop it from the priority stack.`,
+      })
+    }
+  }
+  // Every triggered policy SHOULD appear in priority unless explicitly excluded by mutually_repugnant grouping logic.
+  // (We don't strictly require this — some priority outputs may legitimately omit a policy if the model concluded
+  //  it had no priority role to play. But flag it as advisory rather than fatal.)
+
+  // 4. Citation discipline — case-name match against catalog
+  const trigCatalog = new Set(asArray(stateRule?.trigger_citations))
+  const prioCatalog = new Set(asArray(stateRule?.priority_citations))
+  const exhaCatalog = new Set(asArray(stateRule?.exhaustion_citations))
+
+  const citePassesCatalog = (cite, catalog) => {
+    if (!cite) return true
+    if (catalog.size === 0) return true // empty catalog → engine instructed to skip citing
+    const cl = cite.toLowerCase()
+    for (const c of catalog) {
+      const caseName = String(c).split(',')[0].toLowerCase().trim()
+      if (caseName && cl.includes(caseName)) return true
+    }
+    return false
+  }
+
+  if (!citePassesCatalog(priority.rule_citation, prioCatalog)) {
+    errors.push({
+      type: 'priority_citation_not_in_catalog',
+      message: `priority_analysis.rule_citation (${priority.rule_citation || ''}) does not match any case in state_rule.priority_citations. Use ONLY citations from the supplied catalog or write the doctrine without a citation.`,
+    })
+  }
+
+  const exhaCite = parsed.exhaustion_analysis?.rule_citation
+  if (!citePassesCatalog(exhaCite, exhaCatalog)) {
+    errors.push({
+      type: 'exhaustion_citation_not_in_catalog',
+      message: `exhaustion_analysis.rule_citation (${exhaCite || ''}) does not match any case in state_rule.exhaustion_citations. Use ONLY citations from the supplied catalog.`,
+    })
+  }
+
+  // 5. Allowed enum values
+  const allowedTriggered = new Set(['yes', 'no', 'partial'])
+  for (const t of trigList) {
+    if (t && t.triggered && !allowedTriggered.has(t.triggered)) {
+      errors.push({
+        type: 'invalid_triggered_value',
+        message: `trigger_analysis entry for ${t.policy_id} has triggered="${t.triggered}". Must be "yes", "no", or "partial".`,
+      })
+    }
+  }
+  const allowedRanks = new Set(['primary', 'co-primary', 'excess', 'sub-excess'])
+  for (const r of ordered) {
+    if (r && r.rank && !allowedRanks.has(r.rank)) {
+      errors.push({
+        type: 'invalid_rank_value',
+        message: `priority_analysis entry for ${r.policy_id} has rank="${r.rank}". Must be "primary", "co-primary", "excess", or "sub-excess".`,
+      })
+    }
+  }
+  const allowedExhaustion = new Set(['vertical', 'horizontal', 'mixed', 'undetermined'])
+  if (parsed.exhaustion_analysis?.rule && !allowedExhaustion.has(parsed.exhaustion_analysis.rule)) {
+    errors.push({
+      type: 'invalid_exhaustion_rule',
+      message: `exhaustion_analysis.rule="${parsed.exhaustion_analysis.rule}". Must be "vertical", "horizontal", "mixed", or "undetermined".`,
+    })
+  }
+
+  return errors
+}
+
+function asArray(v) {
+  if (Array.isArray(v)) return v
+  if (typeof v === 'string') {
+    try { const j = JSON.parse(v); return Array.isArray(j) ? j : [] } catch { return [] }
+  }
+  return []
+}
+
+// Build a corrective follow-up prompt for coverage_priority mode.
+function buildCoveragePriorityRetryMessage(errors) {
+  const lines = errors.map((e, i) => `  ${i + 1}. ${e.message}`).join('\n')
+  return `Your previous answer failed the post-validation checks. Specifically:\n\n${lines}\n\nRules of correction:\n- Every input policy MUST have exactly one entry in trigger_analysis.\n- priority_analysis.ordered_policies MUST contain only policies whose triggered value is "yes" or "partial" — never "no".\n- All citations MUST come from state_rule.{trigger,priority,exhaustion}_citations. Do NOT introduce any case the catalog does not contain. If a section's catalog is empty, write the doctrine in general terms with the explicit phrase "no citation in catalog for this point."\n- Return the FULL corrected JSON object — same shape as before. No prose, no markdown fences.`
 }
 
 // ── Mode: extract_terms ─────────────────────────────────────────────────────
@@ -634,6 +905,235 @@ async function handleAllocateSync(supabase, matterId, opts) {
   return await processAllocate(supabase, ctx)
 }
 
+// ── Mode: coverage_priority ─────────────────────────────────────────────────
+//
+// Replaces ALLOCATE for new analyses. Produces a Trigger / Priority /
+// Exhaustion opinion plus a 2-3 paragraph narrative. Same two-phase shape as
+// allocate (start = build the analysis row + payload synchronously; process =
+// run the validate-and-retry loop in the background via EdgeRuntime.waitUntil
+// so the HTTP handler returns an analysisId immediately and the frontend
+// polls lc_analyses.status).
+
+async function startCoveragePriority(supabase, matterId, opts: any = {}) {
+  const { data: matter } = await supabase
+    .from('lc_matters')
+    .select('*, lc_matter_policies(policy_id, role, lc_policies(*, lc_policy_endorsements(*), lc_policy_exclusions(*)))')
+    .eq('id', matterId)
+    .single()
+  if (!matter) throw new Error('Matter not found')
+
+  const policies = (matter.lc_matter_policies || []).map((mp) => mp.lc_policies).filter(Boolean)
+  const governingState = opts.governingStateOverride || matter.governing_state
+  if (!governingState) throw new Error('Matter has no governing_state')
+  if (!policies.length) throw new Error('Matter has no policies attached')
+
+  const { data: rule } = await supabase
+    .from('lc_state_law_rules')
+    .select('*')
+    .eq('state_code', governingState)
+    .maybeSingle()
+
+  const userPayload = JSON.stringify({
+    matter: {
+      name:            matter.name,
+      description:     matter.description ?? null,
+      loss_type:       matter.loss_type,
+      loss_start_date: matter.loss_start_date,
+      loss_end_date:   matter.loss_end_date,
+      venue_state:     matter.venue_state,
+      governing_state: governingState,
+      allegations:     Array.isArray(matter.allegations) ? matter.allegations : asArray(matter.allegations),
+    },
+    state_rule: rule
+      ? {
+          state_code:           rule.state_code,
+          name:                 rule.name,
+          trigger_test:         rule.trigger_test ?? null,
+          trigger_citations:    asArray(rule.trigger_citations),
+          priority_rule:        rule.priority_rule ?? null,
+          priority_citations:   asArray(rule.priority_citations),
+          exhaustion_rule_text: rule.exhaustion_rule_text ?? null,
+          exhaustion_citations: asArray(rule.exhaustion_citations),
+        }
+      : null,
+    policies: policies.map((p) => ({
+      id:                     p.id,
+      carrier:                p.carrier,
+      policy_number:          p.policy_number,
+      effective_date:         p.effective_date,
+      expiration_date:        p.expiration_date,
+      state_issued:           p.state_issued,
+      policy_form:            p.policy_form,
+      per_occurrence_limit:   p.per_occurrence_limit,
+      general_aggregate:      p.general_aggregate,
+      self_insured_retention: p.self_insured_retention,
+      attachment_point:       p.attachment_point,
+      other_insurance_clause: p.other_insurance_clause,
+      other_insurance_type:   p.other_insurance_type,
+      endorsements:           (p.lc_policy_endorsements || []).map((e) => ({
+        endorsement_no: e.endorsement_no,
+        label:          e.label,
+        text:           e.text,
+        effect:         e.effect,
+      })),
+      exclusions: (p.lc_policy_exclusions || []).map((e) => ({
+        label: e.label,
+        text:  e.text,
+      })),
+      has_anti_stacking_clause:           !!p.has_anti_stacking_clause,
+      has_non_cumulation_clause:          !!p.has_non_cumulation_clause,
+      has_continuous_trigger_endorsement: !!p.has_continuous_trigger_endorsement,
+    })),
+  })
+
+  const insertRow: any = {
+    org_id:          matter.org_id,
+    matter_id:       matterId,
+    mode:            'coverage_priority',
+    governing_state: governingState,
+    status:          'running',
+  }
+  if (opts.comparisonGroupId) insertRow.comparison_group_id = opts.comparisonGroupId
+
+  const { data: analysis, error: aErr } = await supabase
+    .from('lc_analyses')
+    .insert(insertRow)
+    .select()
+    .single()
+  if (aErr) throw aErr
+
+  return { analysis, matter, policies, rule, governingState, userPayload }
+}
+
+async function processCoveragePriority(supabase, ctx) {
+  const { analysis, matter, policies, rule, userPayload } = ctx
+  try {
+    const MAX_ATTEMPTS = 3
+    const conversation = [{ role: 'user', content: [{ type: 'text', text: userPayload }] }]
+    let parsed: any = null
+    let validationErrors: any[] = []
+    let attempt = 0
+
+    while (attempt < MAX_ATTEMPTS) {
+      attempt++
+      const claudeResp = await callClaudeMessages(COVERAGE_PRIORITY_SYSTEM, conversation, 8192)
+      const text = claudeResp.content?.[0]?.text || ''
+      try {
+        parsed = parseJsonFromClaude(text)
+      } catch (e) {
+        validationErrors = [{
+          type: 'parse_error',
+          message: `Your previous response was not valid JSON: ${String(e).slice(0, 200)}`,
+        }]
+        conversation.push({ role: 'assistant', content: text })
+        conversation.push({ role: 'user', content: buildCoveragePriorityRetryMessage(validationErrors) })
+        continue
+      }
+      validationErrors = validateCoveragePriority(parsed, matter, policies, rule)
+      if (validationErrors.length === 0) break
+
+      conversation.push({ role: 'assistant', content: text })
+      conversation.push({ role: 'user', content: buildCoveragePriorityRetryMessage(validationErrors) })
+    }
+
+    const validationStatus = validationErrors.length === 0 ? 'valid' : 'needs_review'
+
+    // Update the analysis row with the opinion-shape fields.
+    await supabase.from('lc_analyses').update({
+      narrative:                 parsed?.narrative ?? null,
+      priority_rule_applied:     parsed?.priority_analysis?.rule_applied ?? null,
+      priority_rule_citation:    parsed?.priority_analysis?.rule_citation ?? null,
+      exhaustion_rule:           parsed?.exhaustion_analysis?.rule ?? null,
+      exhaustion_rule_citation:  parsed?.exhaustion_analysis?.rule_citation ?? null,
+      mutually_repugnant_groups: parsed?.priority_analysis?.mutually_repugnant_groups ?? null,
+      status:                    'complete',
+      raw_engine_output:         parsed,
+      validation_status:         validationStatus,
+      validation_errors:         validationErrors.length > 0 ? validationErrors : null,
+      validation_attempts:       attempt,
+    }).eq('id', analysis.id)
+
+    // Replace any existing rows from a previous attempt
+    await supabase.from('lc_analysis_results').delete().eq('analysis_id', analysis.id)
+
+    // Build per-policy result rows: trigger fields for every policy + (if ranked) priority fields.
+    const triggerByPolicy = new Map<string, any>()
+    for (const t of (parsed?.trigger_analysis || [])) {
+      if (t?.policy_id) triggerByPolicy.set(t.policy_id, t)
+    }
+    const priorityByPolicy = new Map<string, any>()
+    for (const r of (parsed?.priority_analysis?.ordered_policies || [])) {
+      if (r?.policy_id) priorityByPolicy.set(r.policy_id, r)
+    }
+
+    // Map Claude's policy_id back to a real policies.id where possible
+    const byKey = new Map<string, string>()
+    for (const p of policies) {
+      byKey.set(p.id, p.id)
+      byKey.set(`${(p.carrier || '').trim()}|${(p.policy_number || '').trim()}`, p.id)
+    }
+    const resolvePolicyId = (claudeId, carrier, policyNumber) => {
+      if (claudeId && byKey.has(claudeId)) return claudeId
+      const k = `${(carrier || '').trim()}|${(policyNumber || '').trim()}`
+      if (byKey.has(k)) return byKey.get(k)
+      for (const p of policies) {
+        if ((p.policy_number || '').trim() === (policyNumber || '').trim()) return p.id
+      }
+      return null
+    }
+
+    const rows: any[] = []
+    let ordering = 0
+    for (const p of policies) {
+      const t = triggerByPolicy.get(p.id) || null
+      const r = priorityByPolicy.get(p.id) || null
+      rows.push({
+        analysis_id:                       analysis.id,
+        policy_id:                         resolvePolicyId(p.id, p.carrier, p.policy_number),
+        carrier:                           p.carrier,
+        policy_number:                     p.policy_number,
+        policy_effective:                  p.effective_date,
+        policy_expiration:                 p.expiration_date,
+        policy_state_issued:               p.state_issued,
+        triggered:                         t?.triggered ?? null,
+        allegations_implicating_coverage:  t?.allegations_implicating_coverage ?? [],
+        coverage_grant_basis:              t?.coverage_grant_basis ?? null,
+        exclusions_considered:             t?.exclusions_considered ?? [],
+        trigger_rationale:                 t?.rationale ?? null,
+        priority_rank:                     r?.rank ?? null,
+        priority_rank_basis:               r?.rank_basis ?? null,
+        other_insurance_quote:             r?.other_insurance_quote ?? null,
+        rationale:                         r?.rank_basis ?? t?.rationale ?? null,
+        ordering:                          ordering++,
+      })
+    }
+
+    if (rows.length) {
+      await supabase.from('lc_analysis_results').insert(rows)
+    }
+
+    return {
+      ok: true,
+      analysisId: analysis.id,
+      mode: 'coverage_priority',
+      validation_status: validationStatus,
+      validation_attempts: attempt,
+      validation_errors: validationErrors,
+    }
+  } catch (e) {
+    await supabase.from('lc_analyses').update({
+      status: 'failed',
+      error:  String(e?.message || e).slice(0, 1000),
+    }).eq('id', analysis.id)
+    throw e
+  }
+}
+
+async function handleCoveragePrioritySync(supabase, matterId, opts) {
+  const ctx = await startCoveragePriority(supabase, matterId, opts)
+  return await processCoveragePriority(supabase, ctx)
+}
+
 // ── HTTP entrypoint ─────────────────────────────────────────────────────────
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
@@ -727,6 +1227,83 @@ serve(async (req) => {
       // Keep the function alive after returning so the work can finish.
       // EdgeRuntime is provided by Supabase's Deno runtime; the typeof guard
       // means tests/local Deno still work (the work just runs synchronously).
+      // @ts-ignore — EdgeRuntime is a Supabase global
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+        // @ts-ignore
+        EdgeRuntime.waitUntil(work)
+      }
+
+      return new Response(JSON.stringify({
+        ok: true,
+        analysisId: ctx.analysis.id,
+        status: 'running',
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    if (mode === 'coverage_priority') {
+      if (!matterId) throw new Error('matterId required')
+
+      // Multi-state comparison: kick off N analyses with one shared group id
+      if (Array.isArray(comparisonStates) && comparisonStates.length >= 2) {
+        // @ts-ignore — Deno crypto.randomUUID
+        const comparisonGroupId = crypto.randomUUID()
+        const ctxs: any[] = []
+        for (const s of comparisonStates) {
+          try {
+            const ctx = await startCoveragePriority(supabase, matterId, {
+              governingStateOverride: s,
+              comparisonGroupId,
+            })
+            ctxs.push(ctx)
+          } catch (e) {
+            console.error('startCoveragePriority failed for', s, e)
+          }
+        }
+        const allWork = Promise.all(ctxs.map(ctx =>
+          processCoveragePriority(supabase, ctx).catch(async (e) => {
+            console.error('processCoveragePriority failed', ctx.governingState, e)
+            try {
+              await supabase.from('lc_analyses').update({
+                status: 'failed',
+                error:  String(e?.message || e).slice(0, 1000),
+              }).eq('id', ctx.analysis.id)
+            } catch {}
+          })
+        ))
+        // @ts-ignore
+        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(allWork)
+        }
+        return new Response(JSON.stringify({
+          ok: true,
+          comparisonGroupId,
+          analysisIds: ctxs.map(c => c.analysis.id),
+          status: 'running',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      const opts = { governingStateOverride }
+
+      if (wait === true) {
+        const out = await handleCoveragePrioritySync(supabase, matterId, opts)
+        return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+      }
+
+      // Default: async — return analysisId immediately and process in background
+      const ctx = await startCoveragePriority(supabase, matterId, opts)
+      const work = processCoveragePriority(supabase, ctx).catch(async (e) => {
+        console.error('processCoveragePriority failed', e)
+        try {
+          await supabase.from('lc_analyses').update({
+            status: 'failed',
+            error:  String(e?.message || e).slice(0, 1000),
+          }).eq('id', ctx.analysis.id)
+        } catch (innerErr) {
+          console.error('failed to mark analysis failed', innerErr)
+        }
+      })
+
       // @ts-ignore — EdgeRuntime is a Supabase global
       if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
         // @ts-ignore
