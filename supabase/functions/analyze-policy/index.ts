@@ -429,8 +429,12 @@ async function callClaudeMessages(system, messages, max_tokens = 4096) {
   // Retry with exponential backoff for transient errors (429 rate-limit, 5XX
   // overloaded/timeout). Real 4XX errors (auth, bad request) bubble up
   // immediately. Up to 4 attempts total: 0s, 1s, 3s, 7s.
+  // Each attempt also has a 120s wall-clock timeout — without this, a hung
+  // Anthropic socket blocks the function's background task forever and the
+  // analysis stays in 'running' state until Supabase reaps the instance.
   const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529])
   const MAX_ATTEMPTS = 4
+  const PER_ATTEMPT_TIMEOUT_MS = 120_000
   let lastErr = null
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -438,9 +442,12 @@ async function callClaudeMessages(system, messages, max_tokens = 4096) {
       const delayMs = (Math.pow(2, attempt) - 1) * 1000  // 1s, 3s, 7s
       await new Promise(res => setTimeout(res, delayMs))
     }
+    const ctrl   = new AbortController()
+    const timer  = setTimeout(() => ctrl.abort(), PER_ATTEMPT_TIMEOUT_MS)
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
+        signal: ctrl.signal,
         headers: {
           'Content-Type':      'application/json',
           'x-api-key':         ANTHROPIC_API_KEY,
@@ -448,6 +455,7 @@ async function callClaudeMessages(system, messages, max_tokens = 4096) {
         },
         body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens, system, messages }),
       })
+      clearTimeout(timer)
       if (r.ok) return await r.json()
 
       const errText = await r.text()
@@ -458,13 +466,16 @@ async function callClaudeMessages(system, messages, max_tokens = 4096) {
       }
       throw new Error(errMsg)  // non-retryable, or final attempt
     } catch (e) {
-      // Network errors are retryable too (DNS, connection reset, etc.)
-      const msg = String(e?.message || e)
+      clearTimeout(timer)
+      // AbortError (our own timeout) and other network errors are retryable.
+      const msg       = String(e?.message || e)
+      const isAbort   = e?.name === 'AbortError'
       const isNetwork = !msg.startsWith('Anthropic ')  // our own throws start with "Anthropic"
-      if (isNetwork && attempt < MAX_ATTEMPTS - 1) {
-        lastErr = e
+      if ((isAbort || isNetwork) && attempt < MAX_ATTEMPTS - 1) {
+        lastErr = isAbort ? new Error(`Anthropic request timed out after ${PER_ATTEMPT_TIMEOUT_MS/1000}s`) : e
         continue
       }
+      if (isAbort) throw new Error(`Anthropic request timed out after ${PER_ATTEMPT_TIMEOUT_MS/1000}s`)
       throw e
     }
   }
