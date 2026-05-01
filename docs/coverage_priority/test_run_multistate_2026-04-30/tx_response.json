@@ -1,0 +1,154 @@
+{
+  "trigger_analysis": [
+    {
+      "policy_id": "pol-aetna-cgl-1985",
+      "carrier": "Aetna",
+      "policy_number": "AET-CGL-1985-001",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Negligence: continuous occupational exposure to asbestos-containing materials at defendant's facility from 1985 through 1998, resulting in bodily injury (mesothelioma)",
+        "Failure to warn: failure to warn workers of known dangers of asbestos exposure",
+        "Strict products liability: utilization of asbestos-containing products without adequate safety controls"
+      ],
+      "coverage_grant_basis": "CGL_OCCURRENCE policy covering bodily injury caused by an occurrence. All three allegations allege bodily injury (mesothelioma diagnosis) arising out of occupational exposure during the policy period (1985\u20131990 is within the employment period 1985\u20131998). The policy's occurrence trigger fires if any bodily injury occurred during the policy period, regardless of when the claim was made. Plaintiff's continuous exposure began in 1985, which falls within the Aetna policy's effective period (1985\u20131990).",
+      "exclusions_considered": [
+        {
+          "label": "Asbestos exclusion",
+          "applies": false,
+          "rationale": "The policy explicitly contains no asbestos-specific exclusion. This is a pre-1985 form CGL issued in 1985 before broad asbestos exclusions became standard."
+        },
+        {
+          "label": "Pollution exclusion (qualified, sudden-and-accidental)",
+          "applies": false,
+          "rationale": "The policy's pollution exclusion applies only to environmental releases (discharge, dispersal, release of pollutants) and is limited to sudden-and-accidental events. Occupational exposure to asbestos products incorporated into the facility is not a sudden discharge of a pollutant; it is a products-liability or occupational-exposure claim. The exclusion text clarifies it does not apply to occupational exposure."
+        }
+      ],
+      "rationale": "Under Texas's eight-corners rule, the Aetna CGL occurrence policy is triggered because: (1) all three allegations allege bodily injury; (2) bodily injury falls within the policy's coverage grant ('caused by an occurrence'); (3) the bodily injury (initial exposure and ongoing exposure) occurred during the policy period (1985\u20131990 encompasses the beginning of the 1985\u20131998 employment); (4) the pollution exclusion does not bar occupational asbestos exposure; and (5) there is no asbestos exclusion. GuideOne Elite Ins. Co. v. Fielder Rd. Baptist Church, 197 S.W.3d 305 (Tex. 2006); Don's Bldg. Supply, Inc. v. OneBeacon Ins. Co., 267 S.W.3d 20 (Tex. 2008)."
+    },
+    {
+      "policy_id": "pol-travelers-cgl-1990",
+      "carrier": "Travelers",
+      "policy_number": "TRV-CGL-1990-002",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Negligence: continuous occupational exposure to asbestos-containing materials at defendant's facility from 1985 through 1998, resulting in bodily injury (mesothelioma)",
+        "Failure to warn: failure to warn workers of known dangers of asbestos exposure",
+        "Strict products liability: utilization of asbestos-containing products without adequate safety controls"
+      ],
+      "coverage_grant_basis": "CGL_OCCURRENCE policy covering bodily injury caused by an occurrence. All three allegations allege bodily injury (mesothelioma) arising out of occupational exposure during the policy period (1990\u20131995). Under a continuous-trigger or exposure-in-residence theory for long-tail bodily injury in Texas, exposure occurring during the 1990\u20131995 policy period triggers coverage for this occurrence-based form.",
+      "exclusions_considered": [
+        {
+          "label": "Pollution exclusion (qualified, sudden-and-accidental)",
+          "applies": false,
+          "rationale": "The policy's pollution exclusion applies only to discharge that is sudden and accidental. Occupational exposure to asbestos products incorporated into the facility is neither a discharge of a pollutant nor sudden and accidental; it is a continuous, occupational bodily-injury exposure claim. The exclusion text explicitly states 'Asbestos products incorporated into manufactured goods or building materials are not pollutants under this exclusion.'"
+        }
+      ],
+      "rationale": "Under Texas's eight-corners rule, the Travelers CGL occurrence policy is triggered because: (1) all three allegations allege bodily injury; (2) bodily injury falls within the policy's coverage grant ('caused by an occurrence'); (3) exposure occurred during the policy period 1990\u20131995 (the second half of the 1985\u20131998 employment); (4) the pollution exclusion does not bar occupational asbestos exposure, and the policy explicitly carves out asbestos products incorporated into materials; and (5) there is no separate asbestos exclusion. GuideOne Elite Ins. Co. v. Fielder Rd. Baptist Church, 197 S.W.3d 305 (Tex. 2006)."
+    },
+    {
+      "policy_id": "pol-hartford-cgl-1995",
+      "carrier": "Hartford",
+      "policy_number": "HTF-CGL-1995-003",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "no",
+      "allegations_implicating_coverage": [
+        "All three allegations implicate bodily injury, which falls within the policy's coverage grant (CGL_OCCURRENCE)"
+      ],
+      "coverage_grant_basis": "CGL_OCCURRENCE policy covering bodily injury caused by an occurrence.",
+      "exclusions_considered": [
+        {
+          "label": "Pollution exclusion (absolute)",
+          "applies": true,
+          "rationale": "The Hartford policy contains an absolute pollution exclusion that bars bodily injury arising out of the discharge, dispersal, seepage, migration, release, or escape of pollutants 'regardless of whether the discharge was sudden, accidental, or known.' This is a strict exclusion with no sudden-and-accidental carve-out. The exclusion applies to all three allegations: (1) negligence for failure to control asbestos-containing materials; (2) failure to warn of asbestos exposure; and (3) strict products liability for use of asbestos-containing products. All three allegations arise out of the release, dispersal, and ongoing exposure to asbestos (a pollutant under Hartford's definition), and the absolute language precludes any coverage regardless of whether the exposure was sudden. The policy does not carve out asbestos products incorporated into building materials, as Travelers does."
+        }
+      ],
+      "rationale": "Under Texas's eight-corners rule, the Hartford CGL policy is NOT triggered because the absolute pollution exclusion bars all three allegations. Although bodily injury from an occurrence nominally falls within the CGL's coverage grant, the Hartford pollution exclusion unambiguously precludes coverage for any discharge, dispersal, seepage, migration, release, or escape of pollutants without regard to whether the discharge was sudden. Asbestos exposure from incorporated materials at the facility constitutes a release or dispersal of a pollutant under this broad language, and the exclusion explicitly does not carve out incorporated products (unlike Travelers). GuideOne Elite Ins. Co. v. Fielder Rd. Baptist Church, 197 S.W.3d 305 (Tex. 2006). The pollution exclusion is applicable and unambiguous; therefore, there is no duty to defend."
+    },
+    {
+      "policy_id": "pol-libertymutual-umb-1985-2000",
+      "carrier": "Liberty Mutual",
+      "policy_number": "LM-UMB-1985-2000-FF",
+      "policy_form": "UMBRELLA",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Negligence: continuous occupational exposure to asbestos-containing materials at defendant's facility from 1985 through 1998, resulting in bodily injury (mesothelioma)",
+        "Failure to warn: failure to warn workers of known dangers of asbestos exposure",
+        "Strict products liability: utilization of asbestos-containing products without adequate safety controls"
+      ],
+      "coverage_grant_basis": "UMBRELLA policy with a follow-form endorsement that incorporates the terms, conditions, and exclusions of the underlying primary policies. The umbrella attaches above the underlying layer ($1,000,000 per-occurrence limits). To the extent the underlying Aetna and Travelers policies are triggered, the umbrella follows their coverage. The umbrella's own exclusions are minimal (none listed), and the follow-form endorsement is neutral, requiring the umbrella to track the primary policies' coverage scopes.",
+      "exclusions_considered": [
+        {
+          "label": "No asbestos exclusion in umbrella itself",
+          "applies": false,
+          "rationale": "The umbrella policy contains no listed exclusions specific to asbestos."
+        },
+        {
+          "label": "Follow-form endorsement (UMB-FF)",
+          "applies": false,
+          "rationale": "The follow-form endorsement requires the umbrella to follow the exclusions and definitions of the underlying primary policies. Since the Aetna CGL (1985\u20131990) has no asbestos exclusion and the Travelers CGL (1990\u20131995) has a qualified pollution exclusion that does not apply to occupational asbestos exposure, the umbrella's coverage likewise follows that scope. The umbrella is thus triggered to the extent the underlying policies are triggered."
+        }
+      ],
+      "rationale": "The Liberty Mutual umbrella is triggered because: (1) it has a follow-form endorsement that incorporates the underlying primary policies' coverage (Aetna and Travelers); (2) those underlying policies are triggered for bodily injury claims; (3) the umbrella itself contains no separate asbestos or pollution exclusion; and (4) the attachment point ($1,000,000) is satisfied by the per-occurrence limits of the underlying primaries. The umbrella will respond as excess coverage over the underlying layer once that layer is exhausted."
+    }
+  ],
+  "priority_analysis": {
+    "ordered_policies": [
+      {
+        "policy_id": "pol-aetna-cgl-1985",
+        "carrier": "Aetna",
+        "policy_number": "AET-CGL-1985-001",
+        "rank": "primary",
+        "rank_basis": "Aetna's Other Insurance clause states 'this insurance shall be excess over such other insurance.' However, Aetna is a CGL_OCCURRENCE form covering the earliest exposure period (1985\u20131990). Travelers and Hartford are subsequent occurrence-based CGLs (1990\u20131995, 1995\u20132000). Under Texas priority rules and the principle that each triggered policy's Other Insurance clause is read on its own terms, the earliest triggered policy in a continuous-exposure scenario typically serves as primary, and subsequent policies layer above. However, both Aetna and Travelers contain identical excess clauses. Aetna (1985\u20131990) is temporally first and covers initial exposure. Where two CGLs each contain excess clauses, Texas pro-rates by limits or treats them as mutually co-primary for their overlapping limits. Aetna's $1,000,000 per-occurrence limit applies first as the earliest policy period.",
+        "other_insurance_quote": "If other valid and collectible insurance applies to a loss also covered by this policy, this insurance shall be excess over such other insurance, whether such other insurance is stated to be primary, contributing, excess, contingent, or otherwise.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-travelers-cgl-1990",
+        "carrier": "Travelers",
+        "policy_number": "TRV-CGL-1990-002",
+        "rank": "co-primary",
+        "rank_basis": "Travelers is a CGL_OCCURRENCE form covering the 1990\u20131995 period, which overlaps with Aetna (1985\u20131990) from 1990 onward and precedes Hartford (1995\u20132000). Travelers's Other Insurance clause states 'this insurance is excess over any other valid and collectible insurance available to the insured.' Both Aetna and Travelers contain pure-excess clauses, making them mutually repugnant. Under Texas law (Mid-Continent, Hardware Dealers), when two policies each contain excess clauses, the policies are read together and prorated by per-occurrence limits. Aetna has a $1,000,000 per-occurrence limit; Travelers also has $1,000,000. They share the primary layer on a pro-rata basis ($1,000,000 / $2,000,000 = 50% each for their overlapping period 1990\u20131995).",
+        "other_insurance_quote": "This insurance is excess over any other valid and collectible insurance available to the insured, whether such other insurance is primary, excess, contingent, or on any other basis.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-hartford-cgl-1995",
+        "carrier": "Hartford",
+        "policy_number": "HTF-CGL-1995-003",
+        "rank": "no coverage",
+        "rank_basis": "Hartford is not triggered due to the absolute pollution exclusion. See trigger analysis.",
+        "other_insurance_quote": "If other valid and collectible insurance is available to the insured for a loss covered under this policy, our obligations are limited as follows: this insurance is excess over any of the other insurance, whether primary, excess, contingent or on any other basis.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-libertymutual-umb-1985-2000",
+        "carrier": "Liberty Mutual",
+        "policy_number": "LM-UMB-1985-2000-FF",
+        "rank": "excess",
+        "rank_basis": "The umbrella policy is an UMBRELLA form with attachment_point of $1,000,000 and a follow-form endorsement. Its Other Insurance clause explicitly states 'This insurance is excess over, and shall not contribute with, any other insurance available to the insured.' Umbrella policies by structural design attach above underlying primary coverage once that underlying layer is exhausted. The attachment point of $1,000,000 aligns with the per-occurrence limits of the primary CGL policies (Aetna and Travelers). The umbrella attaches excess over the combined primary layer.",
+        "other_insurance_quote": "This insurance is excess over, and shall not contribute with, any other insurance available to the insured, whether primary, excess, contingent or on any other basis. This condition does not apply to insurance specifically purchased to be excess of this policy.",
+        "other_insurance_type": "EXCESS"
+      }
+    ],
+    "mutually_repugnant_groups": [
+      {
+        "policy_ids": [
+          "pol-aetna-cgl-1985",
+          "pol-travelers-cgl-1990"
+        ],
+        "reason": "Both Aetna (1985\u20131990) and Travelers (1990\u20131995) are CGL_OCCURRENCE policies that each contain pure-excess Other Insurance clauses ('shall be excess over such other insurance'). For their overlapping period (1990 onward to 1995), both assert that the other is primary, creating mutual repugnancy.",
+        "default_rule": "Under Texas law, mutually repugnant excess clauses are read together and the policies are prorated by per-occurrence limits. Aetna has $1,000,000 per occurrence; Travelers has $1,000,000 per occurrence. For their overlapping exposure period (1990\u20131995), they share co-primary responsibility on a 50%-50% pro-rata basis by limits. Mid-Continent Ins. Co. v. Liberty Mut. Ins. Co., 236 S.W.3d 765 (Tex. 2007); Hardware Dealers Mut. Fire Ins. Co. v. Farmers Ins. Exch., 444 S.W.2d 583 (Tex. 1969)."
+      }
+    ],
+    "rule_applied": "Texas gives effect to clear and unambiguous policy language. Each triggered policy's Other Insurance clause is read on its own terms. Where two or more triggered policies each contain pure-excess Other Insurance clauses, the clauses are mutually repugnant; the policies are read together and prorated by per-occurrence limits among the co-excess policies. An umbrella policy with an explicit excess clause and an attachment point attaches above the underlying primary layer once that layer is exhausted.",
+    "rule_citation": "Mid-Continent Ins. Co. v. Liberty Mut. Ins. Co., 236 S.W.3d 765 (Tex. 2007); Hardware Dealers Mut. Fire Ins. Co. v. Farmers Ins. Exch., 444 S.W.2d 583 (Tex. 1969); Trinity Universal Ins. Co. v. Employers Mut. Cas. Co., 592 F.3d 687 (5th Cir. 2010)."
+  },
+  "exhaustion_analysis": {
+    "rule": "vertical",
+    "rationale": "Texas applies a vertical exhaustion rule: an excess policy attaches once the directly-underlying primary policies are exhausted, regardless of whether other co-primary or excess policies have paid their full limits. Keck, Mahin & Cate v. Nat'l Union Fire Ins. Co. of Pittsburgh, 20 S.W.3d 692 (Tex. 2000). In this matter, the Aetna (1985\u20131990) and Travelers (1990\u20131995) CGL policies are co-primary (prorated by limits for their overlapping period). Once their combined per-occurrence limits are exhausted (or their applicable aggregate limits), the Liberty Mutual umbrella, with its $1,000,000 attachment point and $10,000,000 per-occurrence limit, attaches excess. The insured can exhaust the primary layer first, then tap the umbrella, without being required to exhaust all co-primary policies simultaneously. However, because Aetna and Travelers are mutually repugnant, they share the primary layer pro-rata, and the umbrella attaches once that pro-rated primary layer is depleted.",
+    "rule_citation": "Keck, Mahin & Cate v. Nat'l Union Fire Ins. Co. of Pittsburgh, 20 S.W.3d 692 (Tex. 2000)."
+  },
+  "narrative": "Mason Industrial faces continuous occupational asbestos exposure from 1985 through 1998, resulting in a mesothelioma diagnosis in 2024. The underlying complaint alleges negligence, failure to warn, and strict products liability for defendant's use of asbestos-containing materials throughout that employment period. The relevant policy tower spans from 1985 to 2000 and includes four policies: (1) Aetna CGL (1985\u20131990, $1M per-occurrence), (2) Travelers CGL (1990\u20131995, $1M per-occurrence), (3) Hartford CGL (1995\u20132000, $1M per-occurrence), and (4) Liberty Mutual umbrella (1985\u20132000, $10M per-occurrence, $1M attachment point). Under Texas's eight-corners rule, trigger analysis focuses on whether each allegation potentially falls within the policy's coverage grant and is not barred by an applicable exclusion. All three allegations allege bodily injury (mesothelioma), which falls squarely within the CGL coverage grants (bodily injury caused by an occurrence). The Aetna and Travelers policies are triggered because: (1) exposure occurred during their respective policy periods; (2) neither contains an asbestos exclusion; and (3) their qualified or no pollution exclusions do not bar occupational asbestos exposure to incorporated materials. The Hartford policy, however, is NOT triggered because it contains an absolute pollution exclusion that bars bodily injury arising out of the discharge, dispersal, seepage, migration, release, or escape of pollutants 'regardless of whether the discharge was sudden, accidental, or known.' Asbestos exposure from incorporated materials constitutes such a release, and Hartford's exclusion (unlike Travelers's carve-out) explicitly does not exempt incorporated products. The Liberty Mutual umbrella is triggered via its follow-form endorsement, which requires it to track the underlying primary policies' coverage scope. Among triggered policies, priority analysis applies Texas's rule that each policy's Other Insurance clause is read on its own terms and that mutually repugnant excess clauses result in pro-rata apportionment by limits. Aetna and Travelers each contain pure-excess clauses, making them mutually repugnant for their overlapping period (1990\u20131995). Both are CGL forms and both assert excess-over-other language; under Texas law they are read together and prorated by per-occurrence limit (50%-50%, each $1M). Thus, the primary layer is $1M (shared equally by Aetna and Travelers), and the Liberty Mutual umbrella attaches excess above that $1M threshold at its stated attachment point of $1M, providing coverage for losses exceeding the co-primary limit up to $10M per occurrence. Exhaustion of the primary layer follows a vertical model: once Aetna and Travelers deplete their pro-rated shares of the $1M primary limit, Liberty Mutual attaches. The insured is entitled to defense and indemnification under the triggered policies in the order: co-primary (Aetna and Travelers, pro-rated), then excess (Liberty Mutual umbrella)."
+}
