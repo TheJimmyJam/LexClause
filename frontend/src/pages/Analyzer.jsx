@@ -330,61 +330,12 @@ export default function Analyzer() {
       </header>
 
       {/* ── Drop zone: marching alternating dashes + white-over-blue split fill ── */}
-      <div
-        {...getRootProps()}
-        className={`relative cursor-pointer rounded-2xl mb-6 transition-transform duration-150 ${
-          phase !== 'input' ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-0.5'
-        }`}
-      >
-        <input {...getInputProps()} />
-
-        {/* Animated dashed frame (sits behind the inner card via absolute fill) */}
-        <div
-          className={`absolute inset-0 rounded-2xl lc-dashed-frame ${
-            phase !== 'input' ? 'is-paused' : ''
-          }`}
-          aria-hidden="true"
-        />
-
-        {/* Inner card: top half white, bottom half brand-blue tint */}
-        <div
-          className={`relative m-1 rounded-xl overflow-hidden text-center transition-shadow ${
-            isDragActive ? 'shadow-modal' : 'shadow-card'
-          }`}
-          style={{
-            background: 'linear-gradient(to bottom, #ffffff 0%, #ffffff 50%, var(--brand-100) 50%, var(--brand-50) 100%)',
-          }}
-        >
-          <div className="px-8 py-12">
-            <div className="mx-auto flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md ring-1 ring-brand-200/70 mb-5">
-              <img src="/logo-icon.png" alt="" className="h-12 w-12" />
-            </div>
-            <p
-              className="text-slate-900 font-semibold text-lg tracking-wide"
-              style={{ fontVariant: 'all-small-caps' }}
-            >
-              {isDragActive ? 'Release to upload…' : 'Drop policies + lawsuit here'}
-            </p>
-            <p
-              className="text-slate-600 text-sm mt-1 tracking-wide"
-              style={{ fontVariant: 'all-small-caps' }}
-            >
-              or click anywhere in this box to browse
-            </p>
-            <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider text-brand-800/80 font-medium">
-              <span>CGL</span><span className="text-brand-400">·</span>
-              <span>Pollution</span><span className="text-brand-400">·</span>
-              <span>Professional</span><span className="text-brand-400">·</span>
-              <span>Builder's Risk</span><span className="text-brand-400">·</span>
-              <span>Umbrella</span><span className="text-brand-400">·</span>
-              <span>Excess</span><span className="text-brand-400">·</span>
-              <span>Complaint</span><span className="text-brand-400">·</span>
-              <span>Pre-suit Demand</span><span className="text-brand-400">·</span>
-              <span>ROR</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <DropZone
+        getRootProps={getRootProps}
+        getInputProps={getInputProps}
+        isDragActive={isDragActive}
+        phase={phase}
+      />
 
       {/* Files */}
       {files.length > 0 && (
@@ -478,6 +429,123 @@ export default function Analyzer() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Drop zone — animated white/brand-blue marching dashes around a rounded
+// rectangle, with a white-over-blue split fill inside. Uses SVG so the
+// dashes follow the rounded corners without clipping.
+// ──────────────────────────────────────────────────────────────────────────
+function DropZone({ getRootProps, getInputProps, isDragActive, phase }) {
+  const wrapRef = useRef(null)
+  const [size, setSize] = useState({ w: 0, h: 0 })
+
+  useEffect(() => {
+    if (!wrapRef.current) return
+    const ro = new ResizeObserver((entries) => {
+      const r = entries[0].contentRect
+      setSize({ w: Math.round(r.width), h: Math.round(r.height) })
+    })
+    ro.observe(wrapRef.current)
+    return () => ro.disconnect()
+  }, [])
+
+  // Geometry — a 4px stroke inset 3px from the wrapper edge, on a 16px corner radius.
+  const STROKE = 4
+  const INSET  = 3
+  const RADIUS = 14
+  const DASH   = 14
+  const isPaused = phase !== 'input'
+
+  return (
+    <div
+      ref={wrapRef}
+      {...getRootProps()}
+      className={`relative cursor-pointer rounded-2xl mb-6 transition-transform duration-150 ${
+        isPaused ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-0.5'
+      }`}
+    >
+      <input {...getInputProps()} />
+
+      {/* Animated dashed border — SVG so corners aren't clipped */}
+      {size.w > 0 && size.h > 0 && (
+        <svg
+          className="absolute inset-0 pointer-events-none"
+          width={size.w}
+          height={size.h}
+          aria-hidden="true"
+        >
+          {/* Brand-blue dashes */}
+          <rect
+            x={INSET}
+            y={INSET}
+            width={size.w - INSET * 2}
+            height={size.h - INSET * 2}
+            rx={RADIUS}
+            ry={RADIUS}
+            fill="none"
+            stroke="var(--brand-600)"
+            strokeWidth={STROKE}
+            strokeDasharray={`${DASH} ${DASH}`}
+            className={`lc-dash-stroke ${isPaused ? 'is-paused' : ''}`}
+          />
+          {/* White dashes — same animation, half-cycle delayed → alternating color effect */}
+          <rect
+            x={INSET}
+            y={INSET}
+            width={size.w - INSET * 2}
+            height={size.h - INSET * 2}
+            rx={RADIUS}
+            ry={RADIUS}
+            fill="none"
+            stroke="#ffffff"
+            strokeWidth={STROKE}
+            strokeDasharray={`${DASH} ${DASH}`}
+            className={`lc-dash-stroke lc-dash-offset ${isPaused ? 'is-paused' : ''}`}
+          />
+        </svg>
+      )}
+
+      {/* Inner card: top half white, bottom half brand-blue tint */}
+      <div
+        className={`relative m-2 rounded-xl overflow-hidden text-center transition-shadow ${
+          isDragActive ? 'shadow-modal' : 'shadow-card'
+        }`}
+        style={{
+          background: 'linear-gradient(to bottom, #ffffff 0%, #ffffff 50%, var(--brand-100) 50%, var(--brand-50) 100%)',
+        }}
+      >
+        <div className="px-8 py-12">
+          <div className="mx-auto flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md ring-1 ring-brand-200/70 mb-5">
+            <img src="/logo-icon.png" alt="" className="h-12 w-12" />
+          </div>
+          <p
+            className="text-slate-900 font-semibold text-lg tracking-wide"
+            style={{ fontVariant: 'all-small-caps' }}
+          >
+            {isDragActive ? 'Release to upload…' : 'Drop policies + lawsuit here'}
+          </p>
+          <p
+            className="text-slate-600 text-sm mt-1 tracking-wide"
+            style={{ fontVariant: 'all-small-caps' }}
+          >
+            or click anywhere in this box to browse
+          </p>
+          <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider text-brand-800/80 font-medium">
+            <span>CGL</span><span className="text-brand-400">·</span>
+            <span>Pollution</span><span className="text-brand-400">·</span>
+            <span>Professional</span><span className="text-brand-400">·</span>
+            <span>Builder's Risk</span><span className="text-brand-400">·</span>
+            <span>Umbrella</span><span className="text-brand-400">·</span>
+            <span>Excess</span><span className="text-brand-400">·</span>
+            <span>Complaint</span><span className="text-brand-400">·</span>
+            <span>Pre-suit Demand</span><span className="text-brand-400">·</span>
+            <span>ROR</span>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
