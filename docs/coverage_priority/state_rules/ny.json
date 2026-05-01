@@ -1,0 +1,21 @@
+{
+  "state_code": "NY",
+  "name": "New York",
+  "trigger_test": "New York applies the 'potentiality of coverage' standard for the duty to defend: an insurer is required to defend whenever the four corners of the underlying complaint suggest a reasonable possibility of coverage. For long-tail bodily injury (asbestos, environmental), New York applies a continuous-trigger doctrine: every policy in effect from first exposure through manifestation is triggered. Allegations are construed liberally in favor of the insured for purposes of the duty to defend.",
+  "trigger_citations": [
+    "Continental Cas. Co. v. Rapid-American Corp., 80 N.Y.2d 640 (1993)",
+    "Consol. Edison Co. of N.Y. v. Allstate Ins. Co., 98 N.Y.2d 208 (2002)",
+    "Fitzpatrick v. American Honda Motor Co., 78 N.Y.2d 61 (1991)"
+  ],
+  "priority_rule": "New York reads competing 'Other Insurance' clauses together and seeks to give effect to each where possible. When two or more policies covering the same loss each contain pure-excess Other Insurance clauses, the clauses are treated as mutually repugnant and disregarded; the policies are then prorated, typically by limits or by time-on-risk depending on the loss type. For long-tail losses spanning multiple policy years, New York follows pro-rata allocation by time-on-risk among triggered primaries (Consolidated Edison). A primary-and-non-contributory endorsement requires a written contract between the insureds to fire.",
+  "priority_citations": [
+    "State Farm Fire & Cas. Co. v. LiMauro, 65 N.Y.2d 369 (1985)",
+    "Lumbermens Mut. Cas. Co. v. Allstate Ins. Co., 51 N.Y.2d 651 (1980)",
+    "Consol. Edison Co. of N.Y. v. Allstate Ins. Co., 98 N.Y.2d 208 (2002)"
+  ],
+  "exhaustion_rule": "vertical",
+  "exhaustion_citations": [
+    "In re Viking Pump, Inc., 27 N.Y.3d 244 (2016)",
+    "Olin Corp. v. American Home Assur. Co., 704 F.3d 89 (2d Cir. 2012)"
+  ]
+}
