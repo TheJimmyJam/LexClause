@@ -1,18 +1,16 @@
 // supabase/functions/team-invite/index.ts
 //
 // Sends a team invitation. The caller (must be authenticated) inserts a row
-// into lc_invitations via RLS (which permits only org admins), then this
-// function emails the invitee a signup link via Resend.
+// into lc_invitations, then this function emails the invitee via Supabase's
+// built-in mailer (auth.admin.inviteUserByEmail). No external SMTP / domain
+// verification required — uses Supabase's default mail-from address.
 //
-// Why an edge function instead of doing it client-side?
-//   - We need to send an email, which requires the RESEND_API_KEY held server-side.
-//   - We can also validate that the caller is an admin and gracefully handle
-//     the "user already exists" case (in which case we'd want to instead just
-//     swap their org or invite them to log in — for v1 we just send the link).
+// Why server-side?
+//   - We need the SERVICE_ROLE_KEY to call admin.auth.admin.inviteUserByEmail.
+//   - We validate the caller is an org admin (or super admin) before sending.
 //
-// Required Edge Function secrets (already set for email-opinion):
-//   RESEND_API_KEY
-//   RESEND_FROM_EMAIL  (defaults to "LexClause <onboarding@resend.dev>")
+// Edge Function uses auto-injected Supabase env (SUPABASE_URL, SERVICE_KEY).
+// No additional secrets required for email delivery.
 //
 // Request body:
 //   {
@@ -30,10 +28,8 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0'
 
-const SUPABASE_URL    = Deno.env.get('SUPABASE_URL')!
-const SERVICE_KEY     = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-const RESEND_API_KEY  = Deno.env.get('RESEND_API_KEY')!
-const RESEND_FROM     = Deno.env.get('RESEND_FROM_EMAIL') || 'LexClause <onboarding@resend.dev>'
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
+const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
 const corsHeaders = {
   'Access-Control-Allow-Origin':  '*',
@@ -90,7 +86,6 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    if (!RESEND_API_KEY) throw new Error('RESEND_API_KEY is not configured')
     const authHeader = req.headers.get('Authorization') || ''
     if (!authHeader) throw new Error('Authentication required')
 
@@ -184,33 +179,33 @@ serve(async (req) => {
     // token in query params; Register.jsx forwards it through to signUp metadata.
     const link = `${app_url.replace(/\/$/, '')}/register?invite=${inv.token}&email=${encodeURIComponent(inviteEmail)}`
 
-    // Send via Resend
-    const html = buildInviteHtml({ inviterName, orgName, role, link })
-    const subject = `${inviterName} invited you to ${orgName} on LexClause`
+    // Send via Supabase's built-in mailer. inviteUserByEmail creates an
+    // auth.users row immediately (with our invite_token stamped into the
+    // user's raw_user_meta_data) and emails them a magic link. Our
+    // handle_new_lexclause_user() trigger fires on that INSERT — it reads
+    // invite_token from raw_user_meta_data, looks up the matching invitation
+    // row, and joins the new user to the inviting org with the right role.
+    // When the user clicks the email link, they land authenticated, already
+    // in the right org with no further action required.
     let email_sent = false
     let send_error = null
     try {
-      const resp = await fetch('https://api.resend.com/emails', {
-        method:  'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type':  'application/json',
+      const { error: inviteAuthErr } = await admin.auth.admin.inviteUserByEmail(inviteEmail, {
+        redirectTo: link,  // where they land after clicking the email link
+        data: {
+          invite_token:    inv.token,
+          source_app:      'lexclause',
+          invited_to_org:  orgName,
+          invited_by_name: inviterName,
         },
-        body: JSON.stringify({
-          from: RESEND_FROM,
-          to:   [inviteEmail],
-          subject,
-          html,
-        }),
       })
-      const txt = await resp.text()
-      if (!resp.ok) {
-        send_error = `Resend ${resp.status}: ${txt.slice(0, 300)}`
+      if (inviteAuthErr) {
+        send_error = String(inviteAuthErr.message || inviteAuthErr).slice(0, 400)
       } else {
         email_sent = true
       }
     } catch (e) {
-      send_error = String(e?.message || e).slice(0, 300)
+      send_error = String(e?.message || e).slice(0, 400)
     }
 
     return new Response(JSON.stringify({
@@ -222,6 +217,7 @@ serve(async (req) => {
       link,
       email_sent,
       send_error,
+      sender:         'supabase-auth',
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {
     return new Response(JSON.stringify({ error: String(e?.message || e) }), {
