@@ -1,0 +1,20 @@
+{
+  "state_code": "CA",
+  "name": "California",
+  "trigger_test": "California applies a 'potentiality of coverage' standard: an insurer's duty to defend arises whenever the underlying complaint creates a potential for coverage, evaluated at the outset of the litigation. The court considers both the allegations and any extrinsic facts known to the insurer (Gray v. Zurich, Buss). For long-tail injury — asbestos, environmental, continuous bodily injury — California applies a continuous-trigger theory: every policy in effect from first exposure through manifestation is triggered (Montrose I).",
+  "trigger_citations": [
+    "Gray v. Zurich Ins. Co., 65 Cal.2d 263 (1966)",
+    "Montrose Chem. Corp. v. Admiral Ins. (Montrose I), 10 Cal.4th 645 (1995)",
+    "Buss v. Superior Court, 16 Cal.4th 35 (1997)"
+  ],
+  "priority_rule": "California gives effect to the plain language of policy provisions, including Other Insurance clauses. When two or more triggered policies each contain pure-excess Other Insurance clauses, the clauses are deemed mutually repugnant and the burden is shared among the co-excess policies, typically prorated by limits or equal shares depending on the policy language and the equities. Targeted-tender (selective tender) is permitted in California: an insured may select which carrier to tender a claim to, and a non-selected carrier has no contribution obligation absent contrary policy language. A 'closest-to-the-risk' analysis may apply where one policy is more specifically tailored to the loss than another.",
+  "priority_citations": [
+    "Fireman's Fund Ins. Co. v. Maryland Cas. Co., 65 Cal.App.4th 1279 (1998)",
+    "Dart Indus., Inc. v. Commercial Union Ins. Co., 28 Cal.4th 1059 (2002)",
+    "Reliance Nat'l Indem. Co. v. Gen. Star Indem. Co., 72 Cal.App.4th 1063 (1999)"
+  ],
+  "exhaustion_rule": "vertical",
+  "exhaustion_citations": [
+    "Montrose Chem. Corp. v. Superior Court (Montrose II), 9 Cal.5th 215 (2020)"
+  ]
+}
