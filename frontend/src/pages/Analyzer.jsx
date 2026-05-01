@@ -87,6 +87,7 @@ export default function Analyzer() {
   const [analysis, setAnalysis]                 = useState(null)      // single-state coverage_priority result
   const [comparison, setComparison]             = useState([])        // multi-state results
   const [progress, setProgress]                 = useState({ steps: [], detail: '' })
+  const [errorMessage, setErrorMessage]         = useState('')
 
   // ── Progress helpers (real, event-driven) ────────────────────────────────
   function initProgress(numPolicies, numStates) {
@@ -155,6 +156,32 @@ export default function Analyzer() {
     setFiles(prev => prev.filter(f => f.id !== id))
   }
 
+  // Retry a single file's classification — re-uploads if needed, then re-classifies.
+  async function retryClassification(fileRecord) {
+    const f = fileRecord
+    if (!profile?.org_id) return
+    setFiles(prev => prev.map(x => x.id === f.id ? { ...x, status: 'uploading', error: null } : x))
+    try {
+      let path = f.storagePath
+      if (!path) {
+        path = `${profile.org_id}/${Date.now()}-${f.id.slice(0, 8)}-${f.file.name}`
+        const { error: upErr } = await supabase.storage
+          .from('lc-matter-docs')
+          .upload(path, f.file, { contentType: 'application/pdf' })
+        if (upErr) throw upErr
+      }
+      setFiles(prev => prev.map(x => x.id === f.id ? { ...x, status: 'classifying', storagePath: path } : x))
+      const c = await classifyDocument(path, 'lc-matter-docs')
+      setFiles(prev => prev.map(x => x.id === f.id ? { ...x, status: 'ready', classification: c, error: null } : x))
+      if (TRIGGER_KINDS.has(c?.kind) && c?.venue_state && !governingState) {
+        setGoverningState(c.venue_state)
+      }
+    } catch (e) {
+      setFiles(prev => prev.map(x => x.id === f.id ? { ...x, status: 'error', error: String(e?.message || e) } : x))
+      toast.error(`${f.file.name}: ${e?.message || e}`)
+    }
+  }
+
   // Effective classification: override wins over auto
   function effectiveKind(f) { return f.kindOverride ?? f.classification?.kind ?? null }
   function effectiveForm(f) { return f.formOverride ?? f.classification?.policy_form ?? null }
@@ -175,6 +202,7 @@ export default function Analyzer() {
   async function analyze() {
     if (!canAnalyze) return
     setPhase('running')
+    setErrorMessage('')
     initProgress(policyFiles.length, comparisonStates.length || 1)
     try {
       // ── 1. Create the matter ────────────────────────────────────────────
@@ -272,10 +300,77 @@ export default function Analyzer() {
       setPhase('done')
     } catch (e) {
       console.error('Analyze failed', e)
-      toast.error(`Analysis failed: ${e?.message || e}`)
+      const msg = e?.message || String(e)
+      setErrorMessage(msg)
+      toast.error(`Analysis failed: ${msg}`)
       setProgress(p => ({
         steps: p.steps.map(s => s.status === 'active' ? { ...s, status: 'failed' } : s),
-        detail: String(e?.message || e),
+        detail: msg,
+      }))
+      setPhase('failed')
+    }
+  }
+
+  // Resume from a sensible point after a failure. Most common case: the engine
+  // step failed (Claude hiccup, network blip, validation couldn't reconcile).
+  // The matter + policies already exist — we just re-fire coverage_priority.
+  async function retry() {
+    if (!matterId) {
+      // No matter yet → nothing to resume; full restart
+      return analyze()
+    }
+    setPhase('running')
+    setErrorMessage('')
+    setAnalysis(null)
+    setComparison([])
+    setComparisonGroupId(null)
+    setAnalysisId(null)
+    // Reset failed/pending steps; keep done steps marked done
+    setProgress(p => ({
+      steps: p.steps.map(s => s.status === 'failed' ? { ...s, status: 'pending' } : s),
+      detail: '',
+    }))
+    try {
+      // Mark anything not yet done as the retry path. We do NOT re-extract
+      // allegations or re-upload policies — those are idempotent and already
+      // happened. We just re-run the engine.
+      // (If allegations actually failed before completion, the engine will
+      // produce a sparse output rather than throw, which is the right fallback.)
+      const remaining = ['allegations','upload','extract']
+      for (const id of remaining) {
+        // Anything not yet 'done', mark as 'done' (it succeeded before the
+        // engine step, or we skip re-running it).
+        const st = progress.steps.find(s => s.id === id)
+        if (st && st.status !== 'done') updateStep(id, 'done', '')
+      }
+
+      updateStep('analysis', 'active', comparisonStates.length >= 2 ? 'kicking off jurisdictions in parallel' : 'engine running')
+      if (comparisonStates.length >= 2) {
+        const result = await runCoveragePriorityComparison(matterId, comparisonStates)
+        setComparisonGroupId(result.comparisonGroupId)
+        await pollComparison(
+          result.comparisonGroupId,
+          (done, total) => updateStep('analysis', 'active', `${done} of ${total} jurisdictions complete`),
+        )
+      } else {
+        const result = await runCoveragePriority(matterId, { governingState })
+        setAnalysisId(result.analysisId)
+        await pollAnalysis(
+          result.analysisId,
+          (status) => updateStep('analysis', 'active', status),
+        )
+      }
+      updateStep('analysis', 'done', '')
+      updateStep('finalize', 'done', '')
+      setPhase('done')
+    } catch (e) {
+      console.error('Retry failed', e)
+      const msg = e?.message || String(e)
+      setErrorMessage(msg)
+      toast.error(`Retry failed: ${msg}`)
+      setProgress(p => ({
+        steps: p.steps.map(s => s.status === 'active' ? { ...s, status: 'failed' } : s),
+        detail: msg,
       }))
       setPhase('failed')
     }
@@ -308,7 +403,11 @@ export default function Analyzer() {
       } else if (data?.status === 'running' || data?.status === 'pending') {
         onProgress?.('engine running')
       }
-      if (data?.status === 'complete' || data?.status === 'failed') {
+      if (data?.status === 'failed') {
+        // Throw so the surrounding try/catch surfaces a real failure state
+        throw new Error(data.error || 'Engine returned a failed analysis')
+      }
+      if (data?.status === 'complete') {
         setAnalysis(data)
         return
       }
@@ -408,6 +507,7 @@ export default function Analyzer() {
               onSetKind={(k) => setOverrideKind(f.id, k)}
               onSetForm={(form) => setOverrideForm(f.id, form)}
               onRemove={() => removeFile(f.id)}
+              onRetry={() => retryClassification(f)}
               disabled={phase !== 'input'}
             />
           ))}
@@ -474,16 +574,17 @@ export default function Analyzer() {
       {phase === 'running' && <RunningOverlay progress={progress} />}
 
       {phase === 'failed' && (
-        <div className="card p-6 border-red-200 bg-red-50/40 text-red-900">
-          <div className="flex items-start gap-3">
-            <XCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-red-600" />
-            <div>
-              <p className="font-semibold">Analysis failed.</p>
-              <p className="text-sm mt-1">Check the toast for details, then click "Reset" to try again.</p>
-              <button onClick={() => location.reload()} className="text-sm underline mt-2">Reset</button>
-            </div>
-          </div>
-        </div>
+        <>
+          {/* Keep progress visible so user sees how far we got + which step failed */}
+          <RunningOverlay progress={progress} />
+          <FailedCard
+            failedStep={progress.steps.find(s => s.status === 'failed')}
+            errorMessage={errorMessage}
+            canRetry={!!matterId}
+            onRetry={retry}
+            onReset={() => location.reload()}
+          />
+        </>
       )}
     </div>
   )
@@ -605,7 +706,7 @@ function DropZone({ getRootProps, getInputProps, isDragActive, phase }) {
 // ──────────────────────────────────────────────────────────────────────────
 // File card — one row per uploaded file
 // ──────────────────────────────────────────────────────────────────────────
-function FileCard({ file, effectiveKind, effectiveForm, onSetKind, onSetForm, onRemove, disabled }) {
+function FileCard({ file, effectiveKind, effectiveForm, onSetKind, onSetForm, onRemove, onRetry, disabled }) {
   const f = file
   const c = f.classification
   const isTrigger = TRIGGER_KINDS.has(effectiveKind)
@@ -621,7 +722,21 @@ function FileCard({ file, effectiveKind, effectiveForm, onSetKind, onSetForm, on
 
         {f.status === 'uploading'   && <Status icon="spin" text="Uploading…" />}
         {f.status === 'classifying' && <Status icon="spin" text="Classifying…" />}
-        {f.status === 'error'       && <Status icon="x" text={f.error} />}
+        {f.status === 'error'       && (
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <Status icon="x" text={f.error} />
+            {onRetry && (
+              <button
+                onClick={onRetry}
+                disabled={disabled}
+                className="text-xs font-semibold text-brand-700 hover:text-brand-800 underline tracking-wide disabled:opacity-40"
+                style={{ fontVariant: 'all-small-caps' }}
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         {f.status === 'ready' && (
           <div className="flex items-center gap-2 flex-wrap mt-1">
@@ -899,4 +1014,52 @@ function ResultView({ analysis, comparison, comparisonGroupId, onReset }) {
   }
   if (!analysis) return <div className="p-10 text-center text-slate-500">Loading…</div>
   return <SingleStateResult analysis={analysis} headerActions={newAnalysisBtn} />
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// FailedCard — sits below the running overlay when a step blew up.
+// Shows which step failed, the actual error message, and the recovery
+// options: Retry (re-runs from a sensible resume point) and Start over (full
+// page reload).
+// ──────────────────────────────────────────────────────────────────────────
+function FailedCard({ failedStep, errorMessage, canRetry, onRetry, onReset }) {
+  return (
+    <div className="card p-5 mt-4 border-red-200 bg-red-50/40 text-red-900">
+      <div className="flex items-start gap-3">
+        <XCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-red-600" />
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-base">
+            {failedStep?.label ? `Step failed: ${failedStep.label}.` : 'Analysis failed.'}
+          </p>
+          {errorMessage && (
+            <pre className="text-xs mt-2 whitespace-pre-wrap font-mono bg-red-100/60 p-2.5 rounded border border-red-200/70 max-h-32 overflow-y-auto">
+              {errorMessage}
+            </pre>
+          )}
+          <div className="flex items-center gap-3 mt-4">
+            {canRetry && (
+              <button
+                onClick={onRetry}
+                className="btn-primary"
+                style={{ fontVariant: 'all-small-caps' }}
+              >
+                <Loader2 className="h-4 w-4" /> Retry
+              </button>
+            )}
+            <button
+              onClick={onReset}
+              className="text-sm text-red-800 hover:text-red-900 underline font-medium"
+            >
+              Start over
+            </button>
+          </div>
+          {canRetry && (
+            <p className="text-xs text-red-700/80 mt-3 italic">
+              Retry re-runs the priority engine on the same matter and policies. Documents are not re-uploaded.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
