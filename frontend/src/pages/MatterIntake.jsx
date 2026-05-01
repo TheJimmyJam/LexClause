@@ -441,7 +441,7 @@ function ReviewForm({ form, extracted, filename, update, onBack, onSave, busy, m
       {/* Honest disclaimer */}
       <p className="text-xs text-slate-500 mt-6 inline-flex items-start gap-2">
         <AlertTriangle className="h-3.5 w-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-        Extraction is a draft. Always verify against the source document before relying on these values for an allocation analysis.
+        Extraction is a draft. Always verify against the source document before relying on these values for a coverage analysis.
       </p>
     </>
   )
