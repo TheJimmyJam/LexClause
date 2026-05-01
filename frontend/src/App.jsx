@@ -14,6 +14,7 @@ import Matters        from './pages/Matters.jsx'
 import Analysis       from './pages/Analysis.jsx'
 import Comparison     from './pages/Comparison.jsx'
 import Settings       from './pages/Settings.jsx'
+import AdminConsole   from './pages/AdminConsole.jsx'
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth()
@@ -68,6 +69,9 @@ export default function App() {
           {/* Legacy /team URLs redirect to the Team tab inside Settings */}
           <Route path="/team"                                          element={<Navigate to="/settings?tab=team" replace />} />
           <Route path="/settings"                                      element={<Settings />} />
+
+          {/* Operator-only god-mode console (RLS + page-level guard) */}
+          <Route path="/admin"                                         element={<AdminConsole />} />
         </Route>
 
         {/* Default authenticated landing → Analyzer */}
