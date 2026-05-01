@@ -295,29 +295,84 @@ export default function Analyzer() {
 
   return (
     <div className="p-6 lg:p-10 max-w-4xl mx-auto">
-      <header className="mb-8">
-        <h1 className="text-4xl font-bold text-slate-900 tracking-tight">Coverage priority analysis</h1>
-        <p className="text-slate-600 mt-2 text-lg">
-          Drop your policies and the lawsuit. Get a citable Trigger / Priority / Exhaustion opinion under the controlling state's law.
+      {/* ── Header: logo lockup + serif title with brand underline ─────── */}
+      <header className="mb-10">
+        <div className="flex items-center gap-4 mb-5">
+          <img
+            src="/logo-icon.png"
+            alt="LexClause"
+            className="h-14 w-14 rounded-xl ring-1 ring-brand-200/70 shadow-sm bg-white p-1"
+          />
+          <div className="flex flex-col">
+            <span className="text-[11px] font-semibold tracking-[0.22em] uppercase text-brand-700">
+              LexClause
+            </span>
+            <span className="text-xs text-slate-500 tracking-wide">Coverage priority engine</span>
+          </div>
+        </div>
+
+        <h1 className="font-serif-brand text-5xl lg:text-6xl tracking-tight text-slate-900 leading-none">
+          <span className="lc-title-underline uppercase">Coverage Priority</span>
+          <br />
+          <span className="text-slate-700">Analysis</span>
+        </h1>
+
+        <p className="text-slate-600 mt-7 text-lg max-w-2xl leading-relaxed">
+          Drop your policies and the lawsuit. Get a citable{' '}
+          <strong className="text-brand-700">Trigger</strong> /{' '}
+          <strong className="text-brand-700">Priority</strong> /{' '}
+          <strong className="text-brand-700">Exhaustion</strong>{' '}
+          opinion under the controlling state's law.
         </p>
       </header>
 
-      {/* Drop zone */}
+      {/* ── Drop zone: marching alternating dashes + white-over-blue split fill ── */}
       <div
         {...getRootProps()}
-        className={`card p-10 text-center cursor-pointer border-2 border-dashed transition-colors mb-6 ${
-          phase !== 'input' ? 'opacity-50 cursor-not-allowed' :
-          isDragActive ? 'border-brand-500 bg-brand-50/50' : 'border-slate-300 hover:border-brand-400 hover:bg-slate-50'
+        className={`relative cursor-pointer rounded-2xl mb-6 transition-transform duration-150 ${
+          phase !== 'input' ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-0.5'
         }`}
       >
         <input {...getInputProps()} />
-        <Upload className="h-10 w-10 text-slate-400 mx-auto mb-3" />
-        <p className="text-slate-700 font-medium">
-          {isDragActive ? 'Drop the files here…' : 'Drop policies + lawsuit here, or click to browse'}
-        </p>
-        <p className="text-slate-500 text-sm mt-1">
-          CGL · pollution · professional · builder's risk · umbrella · excess · complaint · pre-suit demand · ROR
-        </p>
+
+        {/* Animated dashed frame (sits behind the inner card via absolute fill) */}
+        <div
+          className={`absolute inset-0 rounded-2xl lc-dashed-frame ${
+            phase !== 'input' ? 'is-paused' : ''
+          }`}
+          aria-hidden="true"
+        />
+
+        {/* Inner card: top half white, bottom half brand-blue tint */}
+        <div
+          className={`relative m-1 rounded-xl overflow-hidden text-center transition-shadow ${
+            isDragActive ? 'shadow-modal' : 'shadow-card'
+          }`}
+          style={{
+            background: 'linear-gradient(to bottom, #ffffff 0%, #ffffff 50%, var(--brand-100) 50%, var(--brand-50) 100%)',
+          }}
+        >
+          <div className="px-8 py-12">
+            <div className="mx-auto flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md ring-1 ring-brand-200/70 mb-5">
+              <img src="/logo-icon.png" alt="" className="h-12 w-12" />
+            </div>
+            <p className="text-slate-900 font-semibold text-lg">
+              {isDragActive ? 'Release to upload…' : 'Drop policies + lawsuit here'}
+            </p>
+            <p className="text-slate-600 text-sm mt-1">or click anywhere in this box to browse</p>
+            <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider text-brand-800/80 font-medium">
+              <span>CGL</span><span className="text-brand-400">·</span>
+              <span>Pollution</span><span className="text-brand-400">·</span>
+              <span>Professional</span><span className="text-brand-400">·</span>
+              <span>Builder's Risk</span><span className="text-brand-400">·</span>
+              <span>Umbrella</span><span className="text-brand-400">·</span>
+              <span>Excess</span><span className="text-brand-400">·</span>
+              <span>Complaint</span><span className="text-brand-400">·</span>
+              <span>Pre-suit Demand</span><span className="text-brand-400">·</span>
+              <span>ROR</span>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Files */}
