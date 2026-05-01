@@ -86,6 +86,28 @@ export default function Analyzer() {
   const [comparisonGroupId, setComparisonGroupId] = useState(null)
   const [analysis, setAnalysis]                 = useState(null)      // single-state coverage_priority result
   const [comparison, setComparison]             = useState([])        // multi-state results
+  const [progress, setProgress]                 = useState({ steps: [], detail: '' })
+
+  // ── Progress helpers (real, event-driven) ────────────────────────────────
+  function initProgress(numPolicies, numStates) {
+    setProgress({
+      steps: [
+        { id: 'matter',      label: 'Creating matter',                                                              status: 'pending' },
+        { id: 'allegations', label: 'Extracting allegations from trigger document',                                 status: 'pending' },
+        { id: 'upload',      label: `Preparing ${numPolicies} polic${numPolicies === 1 ? 'y' : 'ies'}`,             status: 'pending' },
+        { id: 'extract',     label: 'Parsing policy terms',                                                         status: 'pending' },
+        { id: 'analysis',    label: numStates > 1 ? `Running ${numStates}-jurisdiction comparison` : 'Running priority analysis',  status: 'pending' },
+        { id: 'finalize',    label: 'Drafting opinion',                                                             status: 'pending' },
+      ],
+      detail: '',
+    })
+  }
+  function updateStep(id, status, detail) {
+    setProgress(p => ({
+      steps: p.steps.map(s => s.id === id ? { ...s, status } : s),
+      detail: detail !== undefined ? detail : p.detail,
+    }))
+  }
 
   // ── Dropzone ─────────────────────────────────────────────────────────────
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -153,8 +175,10 @@ export default function Analyzer() {
   async function analyze() {
     if (!canAnalyze) return
     setPhase('running')
+    initProgress(policyFiles.length, comparisonStates.length || 1)
     try {
-      // 1. Create the matter (we'll fill in fields after extract_allegations runs)
+      // ── 1. Create the matter ────────────────────────────────────────────
+      updateStep('matter', 'active')
       const { data: matter, error: matterErr } = await supabase
         .from('lc_matters')
         .insert({
@@ -170,14 +194,19 @@ export default function Analyzer() {
         .single()
       if (matterErr) throw matterErr
       setMatterId(matter.id)
+      updateStep('matter', 'done')
 
-      // 2. Extract allegations from the trigger doc — writes back to lc_matters
+      // ── 2. Extract allegations from the trigger doc ─────────────────────
+      updateStep('allegations', 'active', triggerFile.file.name)
       await extractAllegations(triggerFile.storagePath, matter.id)
+      updateStep('allegations', 'done', '')
 
-      // 3. For each policy file: copy from lc-matter-docs to lc-policies,
-      //    create lc_policies row, run extract_terms in parallel.
+      // ── 3. Copy each policy from lc-matter-docs → lc-policies, create rows ──
+      updateStep('upload', 'active', `0 of ${policyFiles.length}`)
       const policies = []
-      for (const pf of policyFiles) {
+      for (let i = 0; i < policyFiles.length; i++) {
+        const pf = policyFiles[i]
+        updateStep('upload', 'active', `${i + 1} of ${policyFiles.length} · ${pf.file.name}`)
         const { data: blob, error: dlErr } = await supabase.storage
           .from('lc-matter-docs')
           .download(pf.storagePath)
@@ -206,48 +235,67 @@ export default function Analyzer() {
           role:      'subject',
         })
       }
+      updateStep('upload', 'done', '')
 
-      // 4. Run extract_terms in parallel; wait for all to finish before priority analysis
+      // ── 4. extract_terms in parallel + wait for completion (live count) ──
+      updateStep('extract', 'active', `0 of ${policies.length} parsed`)
       await Promise.all(policies.map(p => extractPolicyTerms(p.id).catch(e => {
         console.error('extract_terms failed', p.id, e)
       })))
+      await waitForPolicyExtractions(
+        policies.map(p => p.id),
+        90_000,
+        (done, total) => updateStep('extract', 'active', `${done} of ${total} parsed`),
+      )
+      updateStep('extract', 'done', '')
 
-      // Wait for extraction_status to flip to 'complete' on each policy (poll briefly)
-      await waitForPolicyExtractions(policies.map(p => p.id), 60_000)
-
-      // 5. Run coverage_priority (single-state or multi-state comparison)
+      // ── 5. Coverage_priority — single state or multi-state ──────────────
+      updateStep('analysis', 'active', comparisonStates.length >= 2 ? 'kicking off jurisdictions in parallel' : 'engine running')
       if (comparisonStates.length >= 2) {
         const result = await runCoveragePriorityComparison(matter.id, comparisonStates)
         setComparisonGroupId(result.comparisonGroupId)
-        await pollComparison(result.comparisonGroupId)
+        await pollComparison(
+          result.comparisonGroupId,
+          (done, total) => updateStep('analysis', 'active', `${done} of ${total} jurisdictions complete`),
+        )
       } else {
         const result = await runCoveragePriority(matter.id, { governingState })
         setAnalysisId(result.analysisId)
-        await pollAnalysis(result.analysisId)
+        await pollAnalysis(
+          result.analysisId,
+          (status) => updateStep('analysis', 'active', status),
+        )
       }
+      updateStep('analysis', 'done', '')
+      updateStep('finalize', 'done', '')
 
       setPhase('done')
     } catch (e) {
       console.error('Analyze failed', e)
       toast.error(`Analysis failed: ${e?.message || e}`)
+      setProgress(p => ({
+        steps: p.steps.map(s => s.status === 'active' ? { ...s, status: 'failed' } : s),
+        detail: String(e?.message || e),
+      }))
       setPhase('failed')
     }
   }
 
-  async function waitForPolicyExtractions(policyIds, timeoutMs = 60_000) {
+  async function waitForPolicyExtractions(policyIds, timeoutMs = 60_000, onProgress) {
     const start = Date.now()
     while (Date.now() - start < timeoutMs) {
       const { data } = await supabase
         .from('lc_policies')
         .select('id, extraction_status')
         .in('id', policyIds)
-      const allDone = (data || []).every(p => p.extraction_status === 'complete' || p.extraction_status === 'failed')
-      if (allDone) return
+      const done = (data || []).filter(p => p.extraction_status === 'complete' || p.extraction_status === 'failed').length
+      onProgress?.(done, policyIds.length)
+      if (done === policyIds.length) return
       await new Promise(r => setTimeout(r, 1500))
     }
   }
 
-  async function pollAnalysis(id) {
+  async function pollAnalysis(id, onProgress) {
     const start = Date.now()
     while (Date.now() - start < 5 * 60_000) {
       const { data } = await supabase
@@ -255,6 +303,11 @@ export default function Analyzer() {
         .select('*, lc_analysis_results(*), lc_matters(name)')
         .eq('id', id)
         .single()
+      if (data?.validation_attempts && data.validation_attempts > 0 && data.status !== 'complete') {
+        onProgress?.(`validating · attempt ${data.validation_attempts}/3`)
+      } else if (data?.status === 'running' || data?.status === 'pending') {
+        onProgress?.('engine running')
+      }
       if (data?.status === 'complete' || data?.status === 'failed') {
         setAnalysis(data)
         return
@@ -264,7 +317,7 @@ export default function Analyzer() {
     throw new Error('Analysis timed out after 5 minutes')
   }
 
-  async function pollComparison(groupId) {
+  async function pollComparison(groupId, onProgress) {
     const start = Date.now()
     while (Date.now() - start < 5 * 60_000) {
       const { data } = await supabase
@@ -272,8 +325,10 @@ export default function Analyzer() {
         .select('*, lc_analysis_results(*)')
         .eq('comparison_group_id', groupId)
         .order('created_at', { ascending: true })
-      const allDone = (data || []).length > 0 && data.every(a => a.status === 'complete' || a.status === 'failed')
-      if (allDone) {
+      const total = (data || []).length
+      const done = (data || []).filter(a => a.status === 'complete' || a.status === 'failed').length
+      onProgress?.(done, total)
+      if (total > 0 && done === total) {
         setComparison(data)
         return
       }
@@ -416,7 +471,7 @@ export default function Analyzer() {
         </div>
       )}
 
-      {phase === 'running' && <RunningOverlay />}
+      {phase === 'running' && <RunningOverlay progress={progress} />}
 
       {phase === 'failed' && (
         <div className="card p-6 border-red-200 bg-red-50/40 text-red-900">
@@ -704,25 +759,15 @@ function MultiStateSelector({ states, onChange, exclude, disabled }) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// Running overlay — branded loading state with cycling progress steps
+// Running overlay — driven by REAL pipeline events from Analyzer's `progress`
+// state. Each step shows pending / active / done / failed based on what the
+// pipeline has actually completed. The detail line ("3 of 4 parsed",
+// "validating · attempt 2/3", etc.) updates live as events fire.
 // ──────────────────────────────────────────────────────────────────────────
-function RunningOverlay() {
-  const steps = [
-    'Classifying documents',
-    'Extracting allegations',
-    'Parsing policy terms',
-    'Building the trigger map',
-    'Resolving priority order',
-    'Drafting the opinion',
-  ]
-  const [activeStep, setActiveStep] = useState(0)
-  useEffect(() => {
-    const id = setInterval(
-      () => setActiveStep(s => (s + 1 < steps.length ? s + 1 : s)),
-      4000,
-    )
-    return () => clearInterval(id)
-  }, [steps.length])
+function RunningOverlay({ progress }) {
+  const steps = progress?.steps || []
+  const detail = progress?.detail || ''
+  const activeStep = steps.find(s => s.status === 'active')
 
   return (
     <div className="rounded-2xl overflow-hidden border border-brand-200/60 shadow-card">
@@ -734,7 +779,6 @@ function RunningOverlay() {
             'linear-gradient(135deg, var(--brand-700) 0%, var(--brand-600) 45%, var(--brand-500) 100%)',
         }}
       >
-        {/* Subtle animated shimmer overlay */}
         <div
           className="absolute inset-0 opacity-30 pointer-events-none"
           style={{
@@ -745,15 +789,12 @@ function RunningOverlay() {
         />
 
         <div className="relative flex items-center gap-5">
-          {/* Logo with pulsing brand-ring spinner */}
           <div className="relative h-16 w-16 flex-shrink-0">
             <div
               className="absolute inset-0 rounded-2xl border-2 border-white/40 border-t-white"
               style={{ animation: 'spin 1.4s linear infinite' }}
             />
-            <div
-              className="absolute inset-1 rounded-xl bg-white/95 flex items-center justify-center shadow-md"
-            >
+            <div className="absolute inset-1 rounded-xl bg-white/95 flex items-center justify-center shadow-md">
               <img src="/logo-icon.png" alt="" className="h-9 w-9" />
             </div>
           </div>
@@ -766,56 +807,66 @@ function RunningOverlay() {
               <span className="lc-title-underline">Analyzing</span>
             </h2>
             <p
-              className="text-brand-50/95 text-sm mt-3 tracking-wide"
+              className="text-brand-50/95 text-sm mt-3 tracking-wide truncate"
               style={{ fontVariant: 'all-small-caps' }}
             >
-              Reading allegations, parsing policy terms, and assembling the trigger / priority / exhaustion opinion. Usually 30–90 seconds.
+              {activeStep
+                ? `${activeStep.label}${detail ? ' · ' + detail : ''}`
+                : 'Initializing pipeline…'}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Progress steps */}
+      {/* Progress steps — real status from the pipeline */}
       <div className="bg-white p-6">
         <ol className="space-y-2.5">
-          {steps.map((label, i) => {
-            const status = i < activeStep ? 'done' : i === activeStep ? 'active' : 'pending'
-            return (
-              <li key={i} className="flex items-center gap-3 text-sm">
-                {status === 'done' && (
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-600 text-white flex-shrink-0">
-                    <CheckCircle2 className="h-3.5 w-3.5" />
-                  </span>
-                )}
-                {status === 'active' && (
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex-shrink-0 ring-2 ring-brand-300/60">
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  </span>
-                )}
-                {status === 'pending' && (
-                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex-shrink-0">
-                    <span className="block w-2 h-2 rounded-full bg-slate-300" />
-                  </span>
-                )}
-                <span
-                  className={
-                    status === 'done'    ? 'text-slate-500 line-through decoration-brand-300 decoration-2' :
-                    status === 'active'  ? 'text-slate-900 font-medium' :
-                                           'text-slate-400'
-                  }
-                  style={status === 'active' ? { fontVariant: 'all-small-caps', letterSpacing: '0.04em' } : undefined}
-                >
-                  {label}
+          {steps.map((s) => (
+            <li key={s.id} className="flex items-center gap-3 text-sm">
+              {s.status === 'done' && (
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-600 text-white flex-shrink-0">
+                  <CheckCircle2 className="h-3.5 w-3.5" />
                 </span>
-                {status === 'active' && (
-                  <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-brand-700 font-semibold">
-                    <span className="block w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse" />
-                    in progress
-                  </span>
-                )}
-              </li>
-            )
-          })}
+              )}
+              {s.status === 'active' && (
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand-100 text-brand-700 flex-shrink-0 ring-2 ring-brand-300/60">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                </span>
+              )}
+              {s.status === 'pending' && (
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex-shrink-0">
+                  <span className="block w-2 h-2 rounded-full bg-slate-300" />
+                </span>
+              )}
+              {s.status === 'failed' && (
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-red-100 text-red-700 flex-shrink-0 ring-2 ring-red-300/60">
+                  <XCircle className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <span
+                className={
+                  s.status === 'done'    ? 'text-slate-500 line-through decoration-brand-300 decoration-2' :
+                  s.status === 'active'  ? 'text-slate-900 font-medium' :
+                  s.status === 'failed'  ? 'text-red-700 font-medium' :
+                                           'text-slate-400'
+                }
+                style={s.status === 'active' ? { fontVariant: 'all-small-caps', letterSpacing: '0.04em' } : undefined}
+              >
+                {s.label}
+              </span>
+              {s.status === 'active' && detail && (
+                <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-brand-700 font-semibold truncate max-w-[55%]">
+                  <span className="block w-1.5 h-1.5 rounded-full bg-brand-500 animate-pulse flex-shrink-0" />
+                  <span className="truncate">{detail}</span>
+                </span>
+              )}
+              {s.status === 'failed' && (
+                <span className="ml-auto inline-flex items-center gap-1 text-[10px] uppercase tracking-wider text-red-700 font-semibold">
+                  failed
+                </span>
+              )}
+            </li>
+          ))}
         </ol>
 
         <div className="mt-6 pt-5 border-t border-brand-100 flex items-center gap-3 text-xs">
