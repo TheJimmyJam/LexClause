@@ -291,7 +291,15 @@ export default function Landing() {
       <footer className="px-6 lg:px-16 py-8 border-t border-white/5">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
           <div>© {new Date().getFullYear()} LexClause</div>
-          <div>Coverage priority, made defensible</div>
+          <div className="flex items-center gap-4">
+            <Link to="/terms"   className="hover:text-brand-300 transition-colors">Terms</Link>
+            <Link to="/privacy" className="hover:text-brand-300 transition-colors">Privacy</Link>
+            <span className="text-slate-700">·</span>
+            <span>Coverage priority, made defensible</span>
+          </div>
+        </div>
+        <div className="max-w-6xl mx-auto mt-3 text-[11px] text-slate-600 text-center">
+          We never sell, rent, or trade your data. We use it only to provide the service.
         </div>
       </footer>
     </div>
