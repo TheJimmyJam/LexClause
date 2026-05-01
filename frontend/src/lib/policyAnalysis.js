@@ -91,13 +91,17 @@ export async function extractAllegations(storagePath, matterId = null) {
   return data?.parsed
 }
 
-/** Run the coverage_priority engine for a matter. Returns { analysisId, status }. */
+/** Run the coverage_priority engine for a matter. Returns { analysisId, status }.
+ *  Optional opts.comparisonGroupId attaches this single-state run to an existing
+ *  comparison group (used by "Compare under another jurisdiction" on the result page).
+ */
 export async function runCoveragePriority(matterId, opts = {}) {
   const { data, error } = await supabase.functions.invoke('analyze-policy', {
     body: {
-      mode: 'coverage_priority',
+      mode:                   'coverage_priority',
       matterId,
       governingStateOverride: opts.governingState || null,
+      ...(opts.comparisonGroupId ? { comparisonGroupId: opts.comparisonGroupId } : {}),
     },
   })
   if (error) throw error
@@ -123,20 +127,52 @@ export async function emailOpinion(payload) {
   return data
 }
 
-/** Run coverage_priority across multiple states in parallel. Returns { comparisonGroupId, analysisIds }. */
-export async function runCoveragePriorityComparison(matterId, states) {
+/** Run coverage_priority across multiple states in parallel. Returns { comparisonGroupId, analysisIds }.
+ *  Optional opts.comparisonGroupId reuses an existing group instead of minting a new one.
+ */
+export async function runCoveragePriorityComparison(matterId, states, opts = {}) {
   if (!Array.isArray(states) || states.length < 2) {
     throw new Error('runCoveragePriorityComparison requires at least 2 states')
   }
   const { data, error } = await supabase.functions.invoke('analyze-policy', {
     body: {
-      mode: 'coverage_priority',
+      mode:             'coverage_priority',
       matterId,
       comparisonStates: states,
+      ...(opts.comparisonGroupId ? { comparisonGroupId: opts.comparisonGroupId } : {}),
     },
   })
   if (error) throw error
   return data
+}
+
+/** Extend an existing single-state analysis with additional jurisdictions.
+ *  Mints a new comparison_group_id, backfills the original analysis to use it,
+ *  and kicks off the new state runs under the same group.
+ *  Returns the new comparisonGroupId.
+ */
+export async function extendComparison({ matterId, originalAnalysisId, additionalStates }) {
+  if (!matterId || !originalAnalysisId) throw new Error('matterId and originalAnalysisId required')
+  if (!Array.isArray(additionalStates) || additionalStates.length === 0) {
+    throw new Error('additionalStates must be a non-empty array')
+  }
+  const groupId = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : null
+  if (!groupId) throw new Error('crypto.randomUUID unavailable')
+
+  // 1. Backfill the original single-state analysis into the new comparison group
+  const { error: upErr } = await supabase
+    .from('lc_analyses')
+    .update({ comparison_group_id: groupId })
+    .eq('id', originalAnalysisId)
+  if (upErr) throw upErr
+
+  // 2. Kick off the new states under the same group
+  if (additionalStates.length === 1) {
+    await runCoveragePriority(matterId, { governingState: additionalStates[0], comparisonGroupId: groupId })
+  } else {
+    await runCoveragePriorityComparison(matterId, additionalStates, { comparisonGroupId: groupId })
+  }
+  return { comparisonGroupId: groupId }
 }
 
 /**
