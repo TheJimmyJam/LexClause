@@ -8,13 +8,17 @@
  */
 
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, Link } from 'react-router-dom'
 import {
   Shield, Users, FileText, Scale, AlertTriangle, ChevronDown, Search, ArrowLeft,
+  Mail, UserPlus, Loader2, Copy,
 } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
+
+const APP_URL = (typeof window !== 'undefined' && window.location.origin) || 'https://lexclause.netlify.app'
 
 export default function AdminConsole() {
   const { isSuperAdmin, loading: authLoading } = useAuth()
@@ -231,6 +235,7 @@ function Stat({ n, label }) {
 }
 
 function OrgDetails({ org }) {
+  const qc = useQueryClient()
   const { data: members = [] } = useQuery({
     queryKey: ['lc_admin_org_members', org.id],
     queryFn: async () => {
@@ -256,9 +261,24 @@ function OrgDetails({ org }) {
     },
   })
 
+  const { data: pendingInvites = [], refetch: refetchInvites } = useQuery({
+    queryKey: ['lc_admin_org_invites', org.id],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('lc_invitations')
+        .select('id, email, role, token, created_at, expires_at, accepted_at, revoked_at')
+        .eq('org_id', org.id)
+        .is('accepted_at', null)
+        .is('revoked_at',  null)
+        .gt('expires_at', new Date().toISOString())
+        .order('created_at', { ascending: false })
+      return data ?? []
+    },
+  })
+
   return (
     <div className="bg-slate-50/60 border-t border-slate-100 px-5 py-4">
-      <div className="grid lg:grid-cols-2 gap-5">
+      <div className="grid lg:grid-cols-2 gap-5 mb-5">
         <div>
           <h4 className="text-[10px] uppercase tracking-[0.18em] text-brand-700 font-semibold mb-2">Members</h4>
           {members.length === 0 ? (
@@ -295,6 +315,120 @@ function OrgDetails({ org }) {
           )}
         </div>
       </div>
+
+      {/* Super-admin invite form — pre-targeted to this org */}
+      <OrgInviteForm
+        orgId={org.id}
+        orgName={org.name}
+        onInvited={() => {
+          refetchInvites()
+          qc.invalidateQueries({ queryKey: ['lc_admin_orgs'] })
+        }}
+      />
+
+      {/* Pending invitations for this org */}
+      {pendingInvites.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-slate-200">
+          <h4 className="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-semibold mb-2">
+            Pending invitations · {pendingInvites.length}
+          </h4>
+          <ul className="space-y-1.5">
+            {pendingInvites.map(i => (
+              <li key={i.id} className="text-xs text-slate-700 flex items-center justify-between gap-2">
+                <span className="truncate">
+                  {i.email}
+                  <span className="text-slate-400 ml-2">· {i.role}</span>
+                </span>
+                <button
+                  onClick={() => {
+                    const link = `${APP_URL}/register?invite=${i.token}&email=${encodeURIComponent(i.email)}`
+                    navigator.clipboard.writeText(link)
+                      .then(() => toast.success('Invite link copied'))
+                      .catch(() => toast.error('Could not copy'))
+                  }}
+                  className="text-brand-700 hover:text-brand-800 inline-flex items-center gap-1 font-medium"
+                >
+                  <Copy className="h-3 w-3" /> copy link
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function OrgInviteForm({ orgId, orgName, onInvited }) {
+  const [email, setEmail] = useState('')
+  const [role,  setRole]  = useState('member')
+  const [busy,  setBusy]  = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!email.trim() || busy) return
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('team-invite', {
+        body: {
+          email:         email.trim().toLowerCase(),
+          role,
+          app_url:       APP_URL,
+          target_org_id: orgId,
+        },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      if (data?.email_sent) {
+        toast.success(`Invited ${email.trim()} to ${orgName || 'this org'}`)
+      } else if (data?.send_error) {
+        toast.error(`Invite created but email failed: ${data.send_error.slice(0, 200)}`)
+      } else {
+        toast.success(`Invitation created for ${email.trim()}`)
+      }
+      setEmail('')
+      setRole('member')
+      onInvited?.()
+    } catch (e) {
+      toast.error(e?.message || 'Could not send invitation')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
+      <h4 className="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-semibold mb-2 flex items-center gap-1.5">
+        <UserPlus className="h-3.5 w-3.5" />
+        Invite to <span className="text-amber-900 font-bold">{orgName || 'this org'}</span> (god-mode)
+      </h4>
+      <form onSubmit={submit} className="grid sm:grid-cols-[1fr_120px_auto] gap-2 items-start">
+        <input
+          type="email" required placeholder="email@firm.com"
+          className="form-input text-xs"
+          value={email}
+          onChange={e => setEmail(e.target.value)}
+        />
+        <select
+          className="form-input text-xs"
+          value={role}
+          onChange={e => setRole(e.target.value)}
+        >
+          <option value="member">Member</option>
+          <option value="admin">Admin</option>
+        </select>
+        <button
+          type="submit" disabled={busy || !email.trim()}
+          className="btn-primary text-xs"
+          style={{ fontVariant: 'all-small-caps' }}
+        >
+          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
+          {busy ? 'Sending…' : 'Send invite'}
+        </button>
+      </form>
+      <p className="text-[10px] text-amber-700/80 mt-1.5">
+        The invitee will be added to <strong>{orgName || 'this org'}</strong> directly when they accept — not your own org.
+      </p>
     </div>
   )
 }
