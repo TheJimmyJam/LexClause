@@ -124,7 +124,7 @@ export default function MatterDetail() {
           </button>
           <button onClick={handleRunAnalysis} disabled={running} className="btn-primary">
             <Sparkles className="h-4 w-4" />
-            {running ? 'Running…' : 'Run allocation'}
+            {running ? 'Running…' : 'Run analysis'}
           </button>
         </div>
       </div>
@@ -207,7 +207,7 @@ export default function MatterDetail() {
               <div className="text-xs uppercase tracking-wide text-amber-800 font-semibold">Targeted tender</div>
               <p className="text-sm text-slate-700 mt-1">
                 <strong>{matter.governing_state}</strong> allows the insured to selectively tender to specific carriers.
-                Untargeted carriers will be allocated <strong>$0</strong> and the engine will document why.
+                Non-tendered carriers will be excluded from the priority stack and the engine will document why.
                 Leave all unchecked to fall back to {STATE_RULES[matter.governing_state]?.name}'s default rule.
               </p>
             </div>
@@ -242,7 +242,7 @@ export default function MatterDetail() {
           </div>
           {targetedSet.size > 0 && (
             <p className="text-xs text-amber-800 mt-3">
-              Tendered to <strong>{targetedSet.size}</strong> of {attachedPolicies.length} carriers. The engine will allocate $0 to the remaining {attachedPolicies.length - targetedSet.size}.
+              Tendered to <strong>{targetedSet.size}</strong> of {attachedPolicies.length} carriers. The remaining {attachedPolicies.length - targetedSet.size} will be excluded from the priority stack.
             </p>
           )}
         </div>
@@ -304,7 +304,9 @@ export default function MatterDetail() {
             {matter.lc_analyses.map(a => (
               <li key={a.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-50">
                 <Link to={`/matters/${matterId}/analysis/${a.id}`} className="flex-1">
-                  <div className="font-medium text-slate-900">{a.governing_state} · {a.allocation_method?.replaceAll('_', ' ')}</div>
+                  <div className="font-medium text-slate-900">
+                    {a.governing_state} · {a.mode === 'coverage_priority' ? 'Coverage priority' : (a.allocation_method?.replaceAll('_', ' ') || 'Analysis')}
+                  </div>
                   <div className="text-xs text-slate-500 mt-0.5">{new Date(a.created_at).toLocaleString()}</div>
                 </Link>
                 <span className={`badge ${a.status === 'complete' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{a.status}</span>
@@ -410,7 +412,7 @@ function CompareModal({ matter, candidates, attached, onClose, onLaunched }) {
         <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100">
           <div>
             <h2 className="text-xl font-bold text-slate-900">Compare jurisdictions</h2>
-            <p className="text-xs text-slate-500 mt-1">Run the same matter under multiple states' allocation rules side-by-side. Pick 2–5.</p>
+            <p className="text-xs text-slate-500 mt-1">Run the same matter under multiple states' priority rules side-by-side. Pick 2–5.</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
             <X className="h-5 w-5" />
