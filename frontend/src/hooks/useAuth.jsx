@@ -4,9 +4,10 @@ import { supabase } from '../lib/supabase.js'
 const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
-  const [user,    setUser]    = useState(null)
-  const [profile, setProfile] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [user,           setUser]          = useState(null)
+  const [profile,        setProfile]       = useState(null)
+  const [isSuperAdmin,   setIsSuperAdmin]  = useState(false)
+  const [loading,        setLoading]       = useState(true)
 
   async function fetchProfile(userId) {
     const { data } = await supabase
@@ -18,10 +19,25 @@ export function AuthProvider({ children }) {
     return data
   }
 
+  async function fetchSuperAdmin(userId) {
+    // RLS lets super admins SELECT lc_super_admins; non-super-admins get 0 rows.
+    const { data } = await supabase
+      .from('lc_super_admins')
+      .select('user_id')
+      .eq('user_id', userId)
+      .maybeSingle()
+    const flag = !!data
+    setIsSuperAdmin(flag)
+    return flag
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) await fetchProfile(session.user.id)
+      if (session?.user) {
+        await fetchProfile(session.user.id)
+        await fetchSuperAdmin(session.user.id)
+      }
       setLoading(false)
     })
 
@@ -29,8 +45,10 @@ export function AuthProvider({ children }) {
       setUser(session?.user ?? null)
       if (session?.user) {
         fetchProfile(session.user.id)
+        fetchSuperAdmin(session.user.id)
       } else {
         setProfile(null)
+        setIsSuperAdmin(false)
       }
     })
 
@@ -41,7 +59,7 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={{
-      user, profile, loading, signOut,
+      user, profile, isSuperAdmin, loading, signOut,
       refetchProfile: () => fetchProfile(user?.id),
     }}>
       {children}
