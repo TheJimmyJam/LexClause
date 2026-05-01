@@ -1,6 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { supabase } from '../lib/supabase.js'
+import { AuthShell } from './Login.jsx'
 import toast from 'react-hot-toast'
 
 export default function Register() {
@@ -29,58 +30,66 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-brand-900 to-slate-900 flex items-center justify-center p-4 py-10">
-      <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-6">
-            <img src="/logo-icon.png" alt="LexClause" className="w-[72px] h-[72px] rounded-2xl ring-1 ring-white/10 shadow-2xl shadow-brand-700/40" />
+    <AuthShell
+      title="Create Account"
+      subtitle="Trigger · priority · exhaustion — for every matter."
+      wide
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="form-label">First name</label>
+            <input className="form-input" {...register('firstName', { required: true })} />
           </div>
-          <h1 className="text-2xl font-bold text-white font-serif-brand">Create your LexClause account</h1>
-          <p className="text-slate-400 mt-1 text-sm">Coverage analysis for multi-policy, multi-state matters.</p>
+          <div>
+            <label className="form-label">Last name</label>
+            <input className="form-input" {...register('lastName', { required: true })} />
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-2xl p-8 shadow-2xl space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="form-label">First name</label>
-              <input className="form-input" {...register('firstName', { required: true })} />
-            </div>
-            <div>
-              <label className="form-label">Last name</label>
-              <input className="form-input" {...register('lastName', { required: true })} />
-            </div>
-          </div>
+        <div>
+          <label className="form-label">Organization</label>
+          <input
+            className="form-input" placeholder="Smith &amp; Wesson LLP"
+            {...register('orgName', { required: 'Organization is required' })}
+          />
+          {errors.orgName && <p className="text-red-500 text-xs mt-1">{errors.orgName.message}</p>}
+        </div>
 
-          <div>
-            <label className="form-label">Organization</label>
-            <input className="form-input" placeholder="Smith &amp; Wesson LLP"
-              {...register('orgName', { required: 'Organization is required' })} />
-            {errors.orgName && <p className="text-red-500 text-xs mt-1">{errors.orgName.message}</p>}
-          </div>
+        <div>
+          <label className="form-label">Email</label>
+          <input
+            type="email" className="form-input" placeholder="you@firm.com"
+            {...register('email', { required: 'Email is required' })}
+          />
+          {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+        </div>
 
-          <div>
-            <label className="form-label">Email</label>
-            <input type="email" className="form-input" placeholder="you@firm.com"
-              {...register('email', { required: 'Email is required' })} />
-            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
-          </div>
+        <div>
+          <label className="form-label">Password</label>
+          <input
+            type="password" className="form-input" placeholder="At least 8 characters"
+            {...register('password', { required: 'Password is required', minLength: { value: 8, message: 'Min 8 characters' } })}
+          />
+          {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+        </div>
 
-          <div>
-            <label className="form-label">Password</label>
-            <input type="password" className="form-input" placeholder="At least 8 characters"
-              {...register('password', { required: 'Password is required', minLength: { value: 8, message: 'Min 8 characters' } })} />
-            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
-          </div>
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="btn-primary w-full justify-center tracking-wide mt-2"
+          style={{ fontVariant: 'all-small-caps' }}
+        >
+          {isSubmitting ? 'Creating account…' : 'Create Account'}
+        </button>
 
-          <button type="submit" disabled={isSubmitting} className="btn-primary w-full justify-center">
-            {isSubmitting ? 'Creating account…' : 'Create Account'}
-          </button>
-
-          <p className="text-center text-sm text-slate-600">
-            Already have an account? <Link to="/login" className="text-brand-600 hover:text-brand-700 font-medium">Sign in</Link>
-          </p>
-        </form>
-      </div>
-    </div>
+        <p className="text-center text-sm text-slate-600">
+          Already have an account?{' '}
+          <Link to="/login" className="text-brand-700 hover:text-brand-800 font-semibold">
+            Sign in
+          </Link>
+        </p>
+      </form>
+    </AuthShell>
   )
 }
