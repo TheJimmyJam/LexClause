@@ -123,7 +123,7 @@ export default function Dashboard() {
         <h1 className="text-3xl font-bold text-slate-900">
           Welcome back{profile?.first_name ? `, ${profile.first_name}` : ''}
         </h1>
-        <p className="text-slate-600 mt-1">{profile?.organization?.name || 'LexClause'} — coverage allocation overview.</p>
+        <p className="text-slate-600 mt-1">{profile?.organization?.name || 'LexClause'} — coverage priority overview.</p>
       </header>
 
       {/* ── KPI strip ──────────────────────────────────────────────────────── */}
@@ -138,7 +138,7 @@ export default function Dashboard() {
         <KPICard
           icon={TrendingUp}
           accent="bg-emerald-50 text-emerald-700"
-          label="Allocated to carriers"
+          label="Allocated (legacy data)"
           value={fmtMoney(totalAllocated)}
           sub={`${totalCompleted} complete analys${totalCompleted === 1 ? 'is' : 'es'}`}
         />
@@ -226,7 +226,7 @@ export default function Dashboard() {
 
           {/* Allocation methods */}
           <div className="card p-5">
-            <h2 className="font-semibold text-slate-900 mb-1">Allocation methods</h2>
+            <h2 className="font-semibold text-slate-900 mb-1">Analysis methods</h2>
             <p className="text-xs text-slate-500 mb-4">Across {totalCompleted} complete analys{totalCompleted === 1 ? 'is' : 'es'}</p>
             {methodEntries.length === 0 ? (
               <p className="text-sm text-slate-400 italic">No completed analyses yet.</p>
@@ -278,7 +278,7 @@ export default function Dashboard() {
           <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-slate-900">Recent analyses</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Latest 5 allocation runs</p>
+              <p className="text-xs text-slate-500 mt-0.5">Latest 5 analyses</p>
             </div>
           </div>
           {recentAnalyses.length === 0 ? (
@@ -314,10 +314,10 @@ export default function Dashboard() {
 
         {/* Top carriers by allocated $ */}
         <div className="card p-5">
-          <h2 className="font-semibold text-slate-900 mb-1">Top carriers by allocated $</h2>
+          <h2 className="font-semibold text-slate-900 mb-1">Top carriers by allocated $ (legacy)</h2>
           <p className="text-xs text-slate-500 mb-4">Across all complete analyses</p>
           {topCarriers.length === 0 ? (
-            <p className="text-sm text-slate-400 italic">No carrier allocations yet.</p>
+            <p className="text-sm text-slate-400 italic">No legacy carrier allocations.</p>
           ) : (
             <div className="space-y-3">
               {topCarriers.map(([carrier, total]) => (
@@ -351,8 +351,8 @@ export default function Dashboard() {
           icon={Sparkles}
           accent="bg-emerald-50 text-emerald-700"
           to="/matters"
-          title="Run an allocation"
-          desc="Open a matter, attach policies, choose the governing state, and run the allocation."
+          title="Run an analysis"
+          desc="Drop policies and the lawsuit into the Analyzer to get a Trigger / Priority / Exhaustion opinion."
         />
       </div>
     </div>
