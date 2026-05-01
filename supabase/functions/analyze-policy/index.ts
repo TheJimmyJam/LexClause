@@ -192,6 +192,78 @@ Rules:
 - Output MUST be valid JSON — nothing else.`
 
 // ────────────────────────────────────────────────────────────────────────────
+// ONE-SHOT INTAKE PROMPTS
+// ────────────────────────────────────────────────────────────────────────────
+// Used by the single-input UX (Analyzer.jsx). The user drops every document
+// into one bucket and we classify each one to route it to the correct
+// extractor. The complaint / demand / ROR drives the allegation extraction
+// that feeds the COVERAGE_PRIORITY engine.
+const CLASSIFY_DOCUMENT_SYSTEM = `You are reading an uploaded PDF and classifying what kind of document it is so the system can route it to the right extractor. Return ONE JSON object — no prose, no markdown, no fences:
+
+{
+  "kind": "policy" | "complaint" | "petition" | "demand_letter" | "ror_letter" | "claim_summary" | "fnol" | "other",
+  "policy_form": "CGL_OCCURRENCE" | "CGL_CLAIMS_MADE" | "UMBRELLA" | "EXCESS" | "PROFESSIONAL" | "POLLUTION_CONTRACTOR" | "POLLUTION_SITE" | "BUILDERS_RISK" | "D&O" | "PROPERTY" | "OTHER" | null,
+  "carrier_or_caption": string | null,
+  "venue_state": "XX" | null,
+  "governing_state_hint": "XX" | null,
+  "confidence": "high" | "medium" | "low",
+  "summary": string
+}
+
+Rules:
+- kind = "policy" for any insurance policy. Set policy_form to the closest match. A contractor's pollution liability policy is policy_form="POLLUTION_CONTRACTOR"; a site-specific pollution policy is "POLLUTION_SITE"; a builder's risk policy is "BUILDERS_RISK"; a professional/E&O policy is "PROFESSIONAL".
+- kind = "complaint" or "petition" for a filed pleading (look for caption, court, civil action number).
+- kind = "demand_letter" for a pre-suit demand from a plaintiff or counsel.
+- kind = "ror_letter" for a reservation of rights letter from a carrier.
+- kind = "fnol" for a first notice of loss form.
+- kind = "claim_summary" for a carrier's internal claim summary or coverage memo.
+- kind = "other" only if you genuinely cannot tell.
+- carrier_or_caption: for a policy, the carrier's name (e.g. "Travelers"); for a lawsuit, the case caption (e.g. "Doe v. Greenfield Builders").
+- venue_state: for a lawsuit, the 2-letter state code where the case is filed; for a policy, the state on the declarations page.
+- governing_state_hint: usually the same as venue_state for policies; for lawsuits, where the case is filed.
+- summary: one factual sentence describing what this document is. No legal conclusions.
+- Use null where unclear. Do NOT guess.
+- Output MUST be valid JSON.`
+
+const EXTRACT_ALLEGATIONS_SYSTEM = `You are reading a legal document — a complaint, petition, pre-suit demand letter, reservation-of-rights letter, or claim summary — and extracting the structured allegations that drive coverage priority analysis. Return ONE JSON object — no prose, no markdown, no fences:
+
+{
+  "matter_name": string,
+  "named_defendants": [string],
+  "named_plaintiffs": [string],
+  "venue_state": "XX" | null,
+  "loss_start_date": "YYYY-MM-DD" | null,
+  "loss_end_date": "YYYY-MM-DD" | null,
+  "loss_type": "environmental" | "construction_defect" | "product_liability" | "asbestos" | "professional" | "cyber" | "auto" | "general_liability" | "property" | "d&o" | "other" | null,
+  "allegations": [
+    {
+      "count": number | null,
+      "theory_of_liability": string,
+      "conduct_alleged": string,
+      "harm_type": "bodily_injury" | "property_damage" | "property_damage_pollution" | "bodily_injury_long_tail" | "professional_negligence" | "economic_loss" | "punitive" | "other"
+    }
+  ],
+  "description": string
+}
+
+Rules:
+- matter_name: a clean title like "Doe v. Greenfield Builders — TX construction site spill". Under 80 chars.
+- One allegation per logical count. If a count alleges multiple harms (e.g. "negligence resulting in bodily injury AND property damage"), split it.
+- harm_type drives which policies respond:
+  - "bodily_injury" → CGL bodily-injury
+  - "property_damage" → CGL property-damage
+  - "property_damage_pollution" → property damage tied to a pollutant release; pollution policies are typically primary, CGL pollution exclusions usually bar
+  - "bodily_injury_long_tail" → continuous-trigger states (asbestos, environmental exposure)
+  - "professional_negligence" → professional liability / E&O; usually barred from CGL
+  - "economic_loss" → typically not covered by CGL
+  - "punitive" → derivative; coverage depends on state and underlying conduct
+- venue_state: pull from the court caption (the state portion).
+- Dates: pull from the conduct alleged, NOT the filing date. If only "summer 2018" is stated, use "2018-06-01" and note in description.
+- Use null where not stated.
+- description: 2-3 sentence factual summary of the case. No legal conclusions beyond what the document itself states.
+- Output MUST be valid JSON.`
+
+// ────────────────────────────────────────────────────────────────────────────
 // COVERAGE PRIORITY ENGINE
 // ────────────────────────────────────────────────────────────────────────────
 // Replaces the old ALLOCATE_SYSTEM prompt for new analyses (mode='coverage_priority').
@@ -714,6 +786,65 @@ async function handleExtractMatter(supabase, storagePath) {
   return { ok: true, parsed, storagePath }
 }
 
+// ── Mode: classify_document ─────────────────────────────────────────────────
+// Reads any uploaded PDF (from either storage bucket) and returns its kind so
+// the Analyzer UI can route it to the right extractor. Stateless — does not
+// write to the database. The caller decides what to do with the result.
+async function handleClassifyDocument(supabase, opts: { storagePath?: string, bucket?: string }) {
+  const bucket      = opts.bucket || 'lc-matter-docs'
+  const storagePath = opts.storagePath
+  if (!storagePath) throw new Error('storagePath required')
+  const pdfB64 = await downloadAsBase64(supabase, bucket, storagePath)
+  const claudeResp = await callClaude({
+    system: CLASSIFY_DOCUMENT_SYSTEM,
+    userContent: [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfB64 } },
+      { type: 'text', text: 'Classify this PDF. Return only the JSON object — no prose.' },
+    ],
+    max_tokens: 1024,
+  })
+  const text = claudeResp.content?.[0]?.text || ''
+  const parsed = parseJsonFromClaude(text)
+  return { ok: true, parsed, storagePath, bucket }
+}
+
+// ── Mode: extract_allegations ───────────────────────────────────────────────
+// Reads a complaint, petition, pre-suit demand letter, ROR, or claim summary
+// and returns the matter shape + structured allegations array that drives the
+// COVERAGE_PRIORITY engine. If matterId is supplied, writes the allegations
+// + facts back to lc_matters; otherwise returns them inline so the caller can
+// create the matter in a follow-up step.
+async function handleExtractAllegations(supabase, opts: { storagePath?: string, matterId?: string }) {
+  const storagePath = opts.storagePath
+  if (!storagePath) throw new Error('storagePath required')
+  const pdfB64 = await downloadAsBase64(supabase, 'lc-matter-docs', storagePath)
+  const claudeResp = await callClaude({
+    system: EXTRACT_ALLEGATIONS_SYSTEM,
+    userContent: [
+      { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfB64 } },
+      { type: 'text', text: 'Extract the structured allegations from this document. Return only the JSON object — no prose.' },
+    ],
+    max_tokens: 4096,
+  })
+  const text = claudeResp.content?.[0]?.text || ''
+  const parsed = parseJsonFromClaude(text)
+
+  if (opts.matterId) {
+    await supabase.from('lc_matters').update({
+      allegations:      parsed.allegations ?? [],
+      loss_type:        parsed.loss_type ?? null,
+      loss_start_date:  parsed.loss_start_date ?? null,
+      loss_end_date:    parsed.loss_end_date ?? null,
+      venue_state:      parsed.venue_state ?? null,
+      governing_state:  parsed.venue_state ?? null,  // default; user can override
+      description:      parsed.description ?? null,
+      raw_intake_extraction: parsed,
+    }).eq('id', opts.matterId)
+  }
+
+  return { ok: true, parsed, storagePath, matterId: opts.matterId ?? null }
+}
+
 // ── Mode: allocate ──────────────────────────────────────────────────────────
 //
 // Split into two phases so the HTTP handler can return an analysisId
@@ -1139,7 +1270,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, comparisonStates, storagePath, wait } = await req.json()
+    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, comparisonStates, storagePath, bucket, wait } = await req.json()
 
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -1154,6 +1285,16 @@ serve(async (req) => {
 
     if (mode === 'extract_matter') {
       const out = await handleExtractMatter(supabase, storagePath)
+      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    if (mode === 'classify_document') {
+      const out = await handleClassifyDocument(supabase, { storagePath, bucket })
+      return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+
+    if (mode === 'extract_allegations') {
+      const out = await handleExtractAllegations(supabase, { storagePath, matterId })
       return new Response(JSON.stringify(out), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
 
