@@ -461,8 +461,8 @@ function DropZone({ getRootProps, getInputProps, isDragActive, phase }) {
 
   return (
     <div
-      ref={wrapRef}
       {...getRootProps()}
+      ref={wrapRef}
       className={`relative cursor-pointer rounded-2xl mb-6 transition-transform duration-150 ${
         isPaused ? 'opacity-60 cursor-not-allowed' : 'hover:-translate-y-0.5'
       }`}
