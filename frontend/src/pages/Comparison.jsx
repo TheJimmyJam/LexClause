@@ -120,7 +120,7 @@ export default function Comparison() {
         <>
           <div className="card overflow-hidden mb-8">
             <div className="px-5 py-4 border-b border-slate-100">
-              <h2 className="font-semibold text-slate-900">Per-Carrier Allocation, by Jurisdiction</h2>
+              <h2 className="font-semibold text-slate-900">Per-Carrier Analysis, by Jurisdiction</h2>
               <p className="text-xs text-slate-500 mt-0.5">Same matter, same policies — what changes is the controlling law.</p>
             </div>
             <div className="overflow-x-auto">
