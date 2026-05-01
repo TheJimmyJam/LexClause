@@ -14,20 +14,28 @@
  */
 
 import { useState, useRef, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle, CheckCircle2, X, Plus, ScrollText, Scale, Shield, Sparkles,
-  Download, FileText, FileType, ChevronDown, Mail, Loader2, Send,
+  Download, FileText, FileType, ChevronDown, Mail, Loader2, Send, GitCompareArrows,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../hooks/useAuth.jsx'
 import { downloadMemoDocx, downloadMemoPdf, buildMemoDocx, buildMemoPdf } from '../lib/generateCoverageMemo.js'
-import { emailOpinion } from '../lib/policyAnalysis.js'
+import { emailOpinion, extendComparison } from '../lib/policyAnalysis.js'
+
+const ALL_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME',
+  'MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI',
+  'SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+]
 
 // ──────────────────────────────────────────────────────────────────────────
 // Single-state result
 // ──────────────────────────────────────────────────────────────────────────
 export function SingleStateResult({ analysis, headerActions }) {
   const { profile } = useAuth()
+  const [compareOpen, setCompareOpen] = useState(false)
   const results = (analysis.lc_analysis_results || []).slice().sort((a, b) => (a.ordering ?? 0) - (b.ordering ?? 0))
   const triggered = results.filter(r => r.triggered === 'yes' || r.triggered === 'partial')
   const matterName = analysis.lc_matters?.name
@@ -52,11 +60,28 @@ export function SingleStateResult({ analysis, headerActions }) {
               <span className="text-xs text-slate-500 tracking-wide">Coverage priority opinion</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => setCompareOpen(true)}
+              className="btn-secondary"
+              title="Run this same matter under additional states' rules"
+            >
+              <GitCompareArrows className="h-4 w-4" />
+              Compare another state
+            </button>
             <ExportMenu payload={exportPayload} />
             {headerActions}
           </div>
         </div>
+
+        {compareOpen && (
+          <ExtendComparisonModal
+            matterId={analysis.matter_id}
+            analysisId={analysis.id}
+            originalState={analysis.governing_state}
+            onClose={() => setCompareOpen(false)}
+          />
+        )}
 
         <h1 className="font-serif-brand text-4xl lg:text-5xl tracking-tight text-slate-900 leading-none">
           <span className="lc-title-underline uppercase">Coverage Opinion</span>
@@ -595,6 +620,125 @@ function EmailModal({ payload, onClose }) {
               {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
               {sending ? 'Sending…' : `Send to ${chips.length || 0}`}
             </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// ExtendComparisonModal — pick additional states to run the same matter
+// under, fold the original analysis into a new comparison group, navigate
+// to the side-by-side view.
+// ──────────────────────────────────────────────────────────────────────────
+function ExtendComparisonModal({ matterId, analysisId, originalState, onClose }) {
+  const navigate = useNavigate()
+  const [picked, setPicked] = useState(new Set())
+  const [busy, setBusy]     = useState(false)
+
+  const toggle = (code) => {
+    const next = new Set(picked)
+    next.has(code) ? next.delete(code) : next.add(code)
+    setPicked(next)
+  }
+
+  const submit = async () => {
+    if (picked.size === 0 || busy) return
+    if (picked.size > 4) {
+      toast.error('Up to 4 additional jurisdictions per comparison.')
+      return
+    }
+    setBusy(true)
+    try {
+      const { comparisonGroupId } = await extendComparison({
+        matterId,
+        originalAnalysisId: analysisId,
+        additionalStates:   [...picked],
+      })
+      toast.success(`Comparing ${1 + picked.size} jurisdictions…`)
+      navigate(`/matters/${matterId}/compare/${comparisonGroupId}`)
+    } catch (e) {
+      console.error('extendComparison failed', e)
+      toast.error(e?.message || 'Compare failed to start')
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-2xl shadow-2xl shadow-brand-900/40 overflow-hidden bg-white"
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="h-1.5"
+          style={{ background: 'linear-gradient(90deg, var(--brand-700), var(--brand-500), var(--brand-300))' }}
+          aria-hidden="true"
+        />
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <div>
+              <div className="text-[11px] font-semibold tracking-[0.22em] uppercase text-brand-700 mb-1">
+                LexClause
+              </div>
+              <h2 className="font-serif-brand text-2xl uppercase tracking-tight text-slate-900 leading-none">
+                Compare another state
+              </h2>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 -mr-1 -mt-1">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <p className="text-xs text-slate-500 mt-3 mb-4 leading-relaxed">
+            Run the same matter and policies under additional states' priority rules.
+            The current analysis under{' '}
+            <strong className="text-brand-700">{originalState}</strong> will be included
+            in the comparison automatically.
+          </p>
+
+          <div className="grid grid-cols-6 sm:grid-cols-8 gap-1.5 max-h-72 overflow-y-auto pr-1 pb-1">
+            {ALL_STATES.filter(s => s !== originalState).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggle(s)}
+                className={`px-2 py-1.5 text-xs font-mono font-medium rounded transition-colors ${
+                  picked.has(s)
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-slate-50 text-slate-700 hover:bg-brand-50 hover:text-brand-800 border border-slate-200'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-2 mt-5 pt-4 border-t border-slate-100">
+            <div className="text-[11px] text-slate-500">
+              <strong className="text-slate-900">{1 + picked.size}</strong> jurisdictions total
+              {picked.size > 0 && (
+                <span className="text-slate-400 ml-2">
+                  · {originalState} + {[...picked].join(', ')}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={onClose} className="btn-secondary">Cancel</button>
+              <button
+                onClick={submit}
+                disabled={picked.size === 0 || busy}
+                className="btn-primary"
+                style={{ fontVariant: 'all-small-caps' }}
+              >
+                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <GitCompareArrows className="h-4 w-4" />}
+                {busy ? 'Starting…' : 'Compare'}
+              </button>
+            </div>
           </div>
         </div>
       </div>
