@@ -69,9 +69,9 @@ export default function PolicyDetail() {
         )}
       </Section>
 
-      <Section title="Allocation language" className="mt-6">
+      <Section title="Other-insurance / priority language" className="mt-6">
         <pre className="whitespace-pre-wrap text-sm text-slate-700 leading-relaxed">
-          {policy.allocation_method_text || <span className="text-slate-400 italic">No explicit allocation clause found.</span>}
+          {policy.allocation_method_text || <span className="text-slate-400 italic">No explicit Other Insurance or priority language found.</span>}
         </pre>
       </Section>
 
