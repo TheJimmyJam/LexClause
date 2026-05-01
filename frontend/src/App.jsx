@@ -13,7 +13,6 @@ import Analyzer       from './pages/Analyzer.jsx'
 import Matters        from './pages/Matters.jsx'
 import Analysis       from './pages/Analysis.jsx'
 import Comparison     from './pages/Comparison.jsx'
-import Team           from './pages/Team.jsx'
 import Settings       from './pages/Settings.jsx'
 
 function ProtectedRoute({ children }) {
@@ -66,7 +65,8 @@ export default function App() {
           <Route path="/matters/:matterId/analysis/:analysisId"        element={<Analysis />} />
           <Route path="/matters/:matterId/compare/:comparisonGroupId"  element={<Comparison />} />
 
-          <Route path="/team"                                          element={<Team />} />
+          {/* Legacy /team URLs redirect to the Team tab inside Settings */}
+          <Route path="/team"                                          element={<Navigate to="/settings?tab=team" replace />} />
           <Route path="/settings"                                      element={<Settings />} />
         </Route>
 
