@@ -3,14 +3,13 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import {
   LayoutDashboard, FileText, FolderOpen, Settings, LogOut,
-  Menu, X, Moon, Sun,
+  Menu, X, Moon, Sun, Sparkles, History,
 } from 'lucide-react'
 import { useState } from 'react'
 
 const navItems = [
-  { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { to: '/policies',  icon: FileText,        label: 'Policies'  },
-  { to: '/matters',   icon: FolderOpen,      label: 'Matters'   },
+  { to: '/analyze',   icon: Sparkles,        label: 'New analysis', primary: true },
+  { to: '/matters',   icon: History,         label: 'Past matters' },
 ]
 
 export default function Layout() {
@@ -59,7 +58,7 @@ export default function Layout() {
   const SidebarContents = () => (
     <>
       <div className="px-4 py-5 border-b border-white/8">
-        <Link to="/dashboard" className="flex items-center gap-3">
+        <Link to="/analyze" className="flex items-center gap-3">
           <img src="/logo-icon.png" alt="LexClause" className="w-10 h-10 rounded-xl ring-1 ring-white/10" />
           <div>
             <div className="text-white font-bold text-lg leading-none font-serif-brand">LexClause</div>
