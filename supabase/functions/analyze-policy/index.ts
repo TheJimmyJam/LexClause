@@ -1270,7 +1270,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders })
 
   try {
-    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, comparisonStates, storagePath, bucket, wait } = await req.json()
+    const { mode, policyId, matterId, governingStateOverride, triggerTheoryOverride, comparisonStates, comparisonGroupId, storagePath, bucket, wait } = await req.json()
 
     const authHeader = req.headers.get('Authorization') || ''
     const supabase = createClient(SUPABASE_URL, SERVICE_KEY, {
@@ -1384,16 +1384,18 @@ serve(async (req) => {
     if (mode === 'coverage_priority') {
       if (!matterId) throw new Error('matterId required')
 
-      // Multi-state comparison: kick off N analyses with one shared group id
+      // Multi-state comparison: kick off N analyses with one shared group id.
+      // The caller may supply an existing comparisonGroupId to extend a prior
+      // single-state opinion into a comparison; otherwise we mint a new uuid.
       if (Array.isArray(comparisonStates) && comparisonStates.length >= 2) {
         // @ts-ignore — Deno crypto.randomUUID
-        const comparisonGroupId = crypto.randomUUID()
+        const groupId = comparisonGroupId || crypto.randomUUID()
         const ctxs: any[] = []
         for (const s of comparisonStates) {
           try {
             const ctx = await startCoveragePriority(supabase, matterId, {
               governingStateOverride: s,
-              comparisonGroupId,
+              comparisonGroupId: groupId,
             })
             ctxs.push(ctx)
           } catch (e) {
@@ -1418,13 +1420,17 @@ serve(async (req) => {
         }
         return new Response(JSON.stringify({
           ok: true,
-          comparisonGroupId,
+          comparisonGroupId: groupId,
           analysisIds: ctxs.map(c => c.analysis.id),
           status: 'running',
         }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
       }
 
-      const opts = { governingStateOverride }
+      // Single-state — caller may still pass comparisonGroupId to attach this
+      // analysis to an existing group (for "compare under another jurisdiction"
+      // from the result page).
+      const opts: any = { governingStateOverride }
+      if (comparisonGroupId) opts.comparisonGroupId = comparisonGroupId
 
       if (wait === true) {
         const out = await handleCoveragePrioritySync(supabase, matterId, opts)
