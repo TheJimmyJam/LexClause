@@ -8,13 +8,7 @@ import Login          from './pages/Login.jsx'
 import Register       from './pages/Register.jsx'
 import ForgotPassword from './pages/ForgotPassword.jsx'
 import Analyzer       from './pages/Analyzer.jsx'
-import Dashboard      from './pages/Dashboard.jsx'
-import Policies       from './pages/Policies.jsx'
-import PolicyDetail   from './pages/PolicyDetail.jsx'
-import PolicyUpload   from './pages/PolicyUpload.jsx'
 import Matters        from './pages/Matters.jsx'
-import MatterIntake   from './pages/MatterIntake.jsx'
-import MatterDetail   from './pages/MatterDetail.jsx'
 import Analysis       from './pages/Analysis.jsx'
 import Comparison     from './pages/Comparison.jsx'
 import Settings       from './pages/Settings.jsx'
@@ -53,26 +47,21 @@ export default function App() {
   return (
     <AuthProvider>
       <Routes>
-        <Route path="/"               element={<Landing />} />
-        <Route path="/login"          element={<PublicRoute><Login /></PublicRoute>} />
-        <Route path="/register"       element={<PublicRoute><Register /></PublicRoute>} />
+        <Route path="/"                element={<Landing />} />
+        <Route path="/login"           element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/register"        element={<PublicRoute><Register /></PublicRoute>} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-          {/* v0.3 — primary one-shot Analyzer */}
-          <Route path="/analyze"                 element={<Analyzer />} />
+          {/* Primary one-shot Analyzer */}
+          <Route path="/analyze"                                       element={<Analyzer />} />
 
-          {/* History / admin (legacy pages, reachable but de-emphasized) */}
-          <Route path="/dashboard"               element={<Dashboard />} />
-          <Route path="/policies"                element={<Policies />} />
-          <Route path="/policies/upload"         element={<PolicyUpload />} />
-          <Route path="/policies/:policyId"      element={<PolicyDetail />} />
-          <Route path="/matters"                 element={<Matters />} />
-          <Route path="/matters/intake"          element={<MatterIntake />} />
-          <Route path="/matters/:matterId"       element={<MatterDetail />} />
-          <Route path="/matters/:matterId/analysis/:analysisId" element={<Analysis />} />
-          <Route path="/matters/:matterId/compare/:comparisonGroupId" element={<Comparison />} />
-          <Route path="/settings"                element={<Settings />} />
+          {/* Past matters — read-only history */}
+          <Route path="/matters"                                       element={<Matters />} />
+          <Route path="/matters/:matterId/analysis/:analysisId"        element={<Analysis />} />
+          <Route path="/matters/:matterId/compare/:comparisonGroupId"  element={<Comparison />} />
+
+          <Route path="/settings"                                      element={<Settings />} />
         </Route>
 
         {/* Default authenticated landing → Analyzer */}
