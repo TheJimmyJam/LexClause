@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { Eye, EyeOff } from 'lucide-react'
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { supabase } from '../lib/supabase.js'
 import toast from 'react-hot-toast'
 
@@ -81,12 +81,22 @@ export default function Login() {
 export function AuthShell({ title, subtitle, children, wide = false }) {
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 py-10"
+      className="relative min-h-screen flex items-center justify-center p-4 py-10"
       style={{
         background:
           'radial-gradient(circle at top, rgba(37,99,235,0.18) 0%, transparent 60%), linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #0f172a 100%)',
       }}
     >
+      {/* Back to homepage — top-left, subtle */}
+      <Link
+        to="/"
+        className="absolute top-4 left-4 sm:top-6 sm:left-6 inline-flex items-center gap-1.5 text-xs text-slate-300 hover:text-white tracking-wide px-3 py-1.5 rounded-full bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 backdrop-blur-sm transition-colors"
+        style={{ fontVariant: 'all-small-caps' }}
+      >
+        <ArrowLeft className="h-3.5 w-3.5" />
+        Back to homepage
+      </Link>
+
       <div className={`w-full ${wide ? 'max-w-lg' : 'max-w-md'}`}>
         {/* Brand lockup */}
         <div className="text-center mb-8">
