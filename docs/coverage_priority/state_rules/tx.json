@@ -1,0 +1,20 @@
+{
+  "state_code": "TX",
+  "name": "Texas",
+  "trigger_test": "Texas applies the eight-corners rule: the duty to defend is determined by comparing the four corners of the underlying complaint to the four corners of the policy. Allegations are taken as true and ambiguity is resolved in favor of the insured. If any allegation potentially falls within coverage, the duty to defend attaches. For long-tail bodily injury claims, Texas applies an exposure-based or continuous-trigger analysis depending on the disease (e.g. continuous trigger for property damage under Don's Building Supply; exposure-in-residence treatment for some bodily injury). Extrinsic evidence is admissible only in narrow circumstances.",
+  "trigger_citations": [
+    "GuideOne Elite Ins. Co. v. Fielder Rd. Baptist Church, 197 S.W.3d 305 (Tex. 2006)",
+    "Don's Bldg. Supply, Inc. v. OneBeacon Ins. Co., 267 S.W.3d 20 (Tex. 2008)",
+    "Northfield Ins. Co. v. Loving Home Care, Inc., 363 F.3d 523 (5th Cir. 2004)"
+  ],
+  "priority_rule": "Texas gives effect to clear and unambiguous policy language. Each policy's Other Insurance clause is read on its own terms. Where one policy's Other Insurance clause is silent or designates the policy as primary and another contains a pure-excess clause, the silent/primary policy is primary and the excess clause is given effect. Where two or more triggered policies each contain pure-excess Other Insurance clauses, the clauses are mutually repugnant; the policies are read together and prorated by limits among the co-excess policies, unless the policy language itself directs a different result.",
+  "priority_citations": [
+    "Mid-Continent Ins. Co. v. Liberty Mut. Ins. Co., 236 S.W.3d 765 (Tex. 2007)",
+    "Hardware Dealers Mut. Fire Ins. Co. v. Farmers Ins. Exch., 444 S.W.2d 583 (Tex. 1969)",
+    "Trinity Universal Ins. Co. v. Employers Mut. Cas. Co., 592 F.3d 687 (5th Cir. 2010)"
+  ],
+  "exhaustion_rule": "vertical",
+  "exhaustion_citations": [
+    "Keck, Mahin & Cate v. Nat'l Union Fire Ins. Co. of Pittsburgh, 20 S.W.3d 692 (Tex. 2000)"
+  ]
+}
