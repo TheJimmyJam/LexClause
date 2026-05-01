@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 import { useTheme } from '../context/ThemeContext.jsx'
 import {
   LayoutDashboard, FileText, FolderOpen, Settings, LogOut,
-  Menu, X, Moon, Sun, Sparkles, History,
+  Menu, X, Moon, Sun, Sparkles, History, Shield,
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -13,7 +13,7 @@ const navItems = [
 ]
 
 export default function Layout() {
-  const { profile, signOut } = useAuth()
+  const { profile, isSuperAdmin, signOut } = useAuth()
   const { dark, toggle: toggleDark } = useTheme()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -52,6 +52,25 @@ export default function Layout() {
         <Settings className="h-4 w-4 flex-shrink-0" />
         Settings
       </NavLink>
+
+      {/* Super-admin only — visible to wcannon83 / masonwm1 */}
+      {isSuperAdmin && (
+        <NavLink
+          to="/admin"
+          className={({ isActive }) =>
+            `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 mt-2 border border-amber-400/20 ${
+              isActive
+                ? 'bg-amber-500/20 text-amber-100 shadow-sm border-amber-300/40'
+                : 'text-amber-300/90 hover:text-amber-200 hover:bg-amber-500/10'
+            }`
+          }
+          onClick={() => setSidebarOpen(false)}
+          title="LexClause operator console — see all orgs"
+        >
+          <Shield className="h-4 w-4 flex-shrink-0" />
+          Admin · god mode
+        </NavLink>
+      )}
     </>
   )
 
