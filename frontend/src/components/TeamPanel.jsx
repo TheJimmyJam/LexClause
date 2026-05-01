@@ -8,7 +8,7 @@
 
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Mail, UserPlus, Shield, Trash2, Loader2, Copy, RefreshCw, X } from 'lucide-react'
+import { Mail, UserPlus, Shield, Trash2, Loader2, Copy, RefreshCw, X, Building2 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase.js'
 import { useAuth } from '../hooks/useAuth.jsx'
@@ -16,7 +16,7 @@ import { useAuth } from '../hooks/useAuth.jsx'
 const APP_URL = (typeof window !== 'undefined' && window.location.origin) || 'https://lexclause.netlify.app'
 
 export default function TeamPanel() {
-  const { profile } = useAuth()
+  const { profile, isSuperAdmin } = useAuth()
   const isAdmin = profile?.role === 'admin'
   const orgId   = profile?.org_id
   const myId    = profile?.id
@@ -133,12 +133,15 @@ export default function TeamPanel() {
 
   return (
     <div>
-      {/* Invite form (admin only) */}
+      {/* God-mode invite — super admins only, can target ANY org */}
+      {isSuperAdmin && <GodModeInviteSection />}
+
+      {/* Standard invite form (admins of THIS org only) */}
       {isAdmin && (
         <div className="card p-5 mb-5 bg-gradient-to-br from-brand-50/40 to-cyan-50/30 border-brand-200/60">
           <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm">
             <UserPlus className="h-4 w-4 text-brand-600" />
-            Invite a member
+            Invite a member to your org
           </h3>
           <form onSubmit={sendInvite} className="grid sm:grid-cols-[1fr_140px_auto] gap-2 items-start">
             <input
@@ -279,6 +282,128 @@ export default function TeamPanel() {
           Only organization admins can invite or remove members. Ask an admin to send a new invite.
         </p>
       )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// GodModeInviteSection — super-admin-only. Lets a LexClause operator invite
+// a user into ANY organization, not just their own. Pulls all orgs (RLS
+// allows it for super admins via the additive policy from migration 018).
+// ──────────────────────────────────────────────────────────────────────────
+function GodModeInviteSection() {
+  const [orgId, setOrgId] = useState('')
+  const [email, setEmail] = useState('')
+  const [role,  setRole]  = useState('member')
+  const [busy,  setBusy]  = useState(false)
+
+  const { data: orgs = [], isLoading: orgsLoading } = useQuery({
+    queryKey: ['lc_admin_orgs_for_invite'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('lc_organizations')
+        .select('id, name, created_at')
+        .order('name', { ascending: true })
+      if (error) throw error
+      return data ?? []
+    },
+  })
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!orgId || !email.trim() || busy) return
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('team-invite', {
+        body: {
+          email:         email.trim().toLowerCase(),
+          role,
+          app_url:       APP_URL,
+          target_org_id: orgId,
+        },
+      })
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
+      const targetOrg = orgs.find(o => o.id === orgId)?.name || 'the selected org'
+      if (data?.email_sent) {
+        toast.success(`Invited ${email.trim()} to ${targetOrg}`)
+      } else if (data?.send_error) {
+        toast.error(`Invite created but email failed: ${data.send_error.slice(0, 200)}`)
+      } else {
+        toast.success(`Invitation created for ${email.trim()}`)
+      }
+      setEmail('')
+      setRole('member')
+      // Leave orgId selected — admins often invite multiple to the same org
+    } catch (e) {
+      toast.error(e?.message || 'Could not send invitation')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="card p-5 mb-5 border-amber-200 bg-amber-50/40">
+      <h3 className="font-semibold text-amber-900 mb-3 flex items-center gap-2 text-sm uppercase tracking-wider">
+        <Shield className="h-4 w-4" />
+        God-mode · invite to any organization
+      </h3>
+      <form onSubmit={submit} className="grid sm:grid-cols-[1fr_1fr_120px_auto] gap-2 items-start">
+        <div>
+          <label className="block text-[10px] font-semibold uppercase tracking-wider text-amber-800 mb-1 inline-flex items-center gap-1">
+            <Building2 className="h-3 w-3" /> Organization
+          </label>
+          <select
+            required
+            className="form-input text-sm"
+            value={orgId}
+            onChange={e => setOrgId(e.target.value)}
+            disabled={orgsLoading}
+          >
+            <option value="">{orgsLoading ? 'Loading…' : `— Select an org (${orgs.length}) —`}</option>
+            {orgs.map(o => (
+              <option key={o.id} value={o.id}>{o.name || '(unnamed org)'}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold uppercase tracking-wider text-amber-800 mb-1">Email</label>
+          <input
+            type="email" required placeholder="email@firm.com"
+            className="form-input text-sm"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="block text-[10px] font-semibold uppercase tracking-wider text-amber-800 mb-1">Role</label>
+          <select
+            className="form-input text-sm"
+            value={role}
+            onChange={e => setRole(e.target.value)}
+          >
+            <option value="member">Member</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] mb-1 invisible select-none">_</label>
+          <button
+            type="submit"
+            disabled={busy || !orgId || !email.trim()}
+            className="btn-primary"
+            style={{ fontVariant: 'all-small-caps' }}
+          >
+            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+            {busy ? 'Sending…' : 'Send'}
+          </button>
+        </div>
+      </form>
+      <p className="text-[11px] text-amber-700/80 mt-2 leading-snug">
+        Visible only to LexClause operators. The invitee is added to the selected org — not your own — when
+        they accept. Manage all orgs from the{' '}
+        <a href="/admin" className="underline font-semibold">/admin</a> console.
+      </p>
     </div>
   )
 }
