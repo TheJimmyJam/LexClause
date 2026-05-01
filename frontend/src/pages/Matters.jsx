@@ -63,7 +63,7 @@ export default function Matters() {
       <header className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Matters</h1>
-          <p className="text-slate-600 mt-1">Coverage matters where allocation analyses live.</p>
+          <p className="text-slate-600 mt-1">Coverage priority analyses by matter.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link to="/matters/intake" className="btn-secondary">
