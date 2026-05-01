@@ -317,7 +317,10 @@ export default function Analyzer() {
           <span className="text-slate-700">Analysis</span>
         </h1>
 
-        <p className="text-slate-600 mt-7 text-lg max-w-2xl leading-relaxed">
+        <p
+          className="text-slate-600 mt-7 text-lg max-w-2xl leading-relaxed tracking-wide"
+          style={{ fontVariant: 'all-small-caps' }}
+        >
           Drop your policies and the lawsuit. Get a citable{' '}
           <strong className="text-brand-700">Trigger</strong> /{' '}
           <strong className="text-brand-700">Priority</strong> /{' '}
@@ -356,10 +359,18 @@ export default function Analyzer() {
             <div className="mx-auto flex items-center justify-center w-20 h-20 rounded-2xl bg-white shadow-md ring-1 ring-brand-200/70 mb-5">
               <img src="/logo-icon.png" alt="" className="h-12 w-12" />
             </div>
-            <p className="text-slate-900 font-semibold text-lg">
+            <p
+              className="text-slate-900 font-semibold text-lg tracking-wide"
+              style={{ fontVariant: 'all-small-caps' }}
+            >
               {isDragActive ? 'Release to upload…' : 'Drop policies + lawsuit here'}
             </p>
-            <p className="text-slate-600 text-sm mt-1">or click anywhere in this box to browse</p>
+            <p
+              className="text-slate-600 text-sm mt-1 tracking-wide"
+              style={{ fontVariant: 'all-small-caps' }}
+            >
+              or click anywhere in this box to browse
+            </p>
             <div className="mt-6 inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] uppercase tracking-wider text-brand-800/80 font-medium">
               <span>CGL</span><span className="text-brand-400">·</span>
               <span>Pollution</span><span className="text-brand-400">·</span>
