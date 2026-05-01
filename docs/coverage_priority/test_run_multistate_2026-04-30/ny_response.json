@@ -1,0 +1,142 @@
+{
+  "trigger_analysis": [
+    {
+      "policy_id": "pol-aetna-cgl-1985",
+      "carrier": "Aetna",
+      "policy_number": "AET-CGL-1985-001",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Negligent failure to identify, control, or warn of asbestos-containing materials, 1985\u20131998",
+        "Failure to warn workers of known dangers of asbestos despite scientific consensus by 1985",
+        "Strict products liability for utilization of asbestos-containing products without adequate safety controls"
+      ],
+      "coverage_grant_basis": "Policy covers bodily injury caused by occurrence during policy period (1985\u20131990). Negligence, failure-to-warn, and strict products liability for asbestos exposure all allege bodily injury within the four corners. No asbestos-specific exclusion in this pre-1985 form; qualified pollution exclusion does not apply to occupational asbestos exposure within manufactured facility.",
+      "exclusions_considered": [
+        {
+          "label": "Pollution exclusion (qualified)",
+          "applies": false,
+          "rationale": "Policy exclusion is sudden-and-accidental version. Occupational inhalation of asbestos incorporated into facility materials does not trigger environmental pollution exclusion; exclusion targets sudden environmental releases, not product-in-place exposures."
+        },
+        {
+          "label": "Asbestos-specific exclusion",
+          "applies": false,
+          "rationale": "None exists in this form. Pre-1985 CGL forms typically lack explicit asbestos riders."
+        }
+      ],
+      "rationale": "Aetna is triggered for the continuous-trigger period 1985\u20131990 under New York's continuous-trigger doctrine for long-tail asbestos injury. Negligence, failure-to-warn, and products-liability counts all allege bodily injury occurring during policy term. No exclusion bars coverage. Allegations are construed liberally in favor of insured for duty-to-defend purposes."
+    },
+    {
+      "policy_id": "pol-travelers-cgl-1990",
+      "carrier": "Travelers",
+      "policy_number": "TRV-CGL-1990-002",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Negligent failure to identify, control, or warn of asbestos-containing materials, 1985\u20131998",
+        "Failure to warn workers of known dangers of asbestos despite scientific consensus by 1985",
+        "Strict products liability for utilization of asbestos-containing products without adequate safety controls"
+      ],
+      "coverage_grant_basis": "Policy covers bodily injury caused by occurrence during policy period (1990\u20131995). Allegations allege continuous occupational exposure through 1995, triggering this policy for the 1990\u20131995 continuous-trigger window. No asbestos-specific exclusion; qualified pollution exclusion excludes only sudden-and-accidental environmental discharge, not product-in-place occupational exposure.",
+      "exclusions_considered": [
+        {
+          "label": "Pollution exclusion (qualified)",
+          "applies": false,
+          "rationale": "Exclusion applies only to sudden-and-accidental discharge of pollutants. Asbestos products incorporated into facility are not pollutants; occupational inhalation does not constitute environmental discharge."
+        }
+      ],
+      "rationale": "Travelers is triggered for 1990\u20131995 under continuous-trigger doctrine. Allegations of negligence, failure-to-warn, and products liability all allege bodily injury occurring during policy period. Qualified pollution exclusion does not bar occupational asbestos exposure. Potentiality of coverage satisfied."
+    },
+    {
+      "policy_id": "pol-hartford-cgl-1995",
+      "carrier": "Hartford",
+      "policy_number": "HTF-CGL-1995-003",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "no",
+      "allegations_implicating_coverage": [
+        "Negligent failure to identify, control, or warn of asbestos-containing materials, 1985\u20131998",
+        "Failure to warn workers of known dangers of asbestos despite scientific consensus by 1985",
+        "Strict products liability for utilization of asbestos-containing products without adequate safety controls"
+      ],
+      "coverage_grant_basis": "Policy covers bodily injury caused by occurrence during policy period (1995\u20132000). Allegations allege continuous occupational exposure that extends through 1998, nominally falling within policy term.",
+      "exclusions_considered": [
+        {
+          "label": "Pollution exclusion (absolute)",
+          "applies": true,
+          "rationale": "Hartford's absolute pollution exclusion bars bodily injury arising out of discharge, dispersal, release, or escape of pollutants regardless of whether accidental or sudden. Asbestos fibers released from deteriorating materials in occupational exposure constitute release of pollutant. Exclusion expressly applies 'regardless of whether discharge was sudden, accidental, or known.' Covers every exposure allegation."
+        }
+      ],
+      "rationale": "Hartford is not triggered. Although allegations nominally allege bodily injury during 1995\u20131998 policy period, Hartford's absolute pollution exclusion bars all three counts. The exclusion applies to any release of asbestos, not merely sudden releases, and no carve-out for product-in-place exposure exists. Every allegation falls within exclusion; no potentiality of coverage."
+    },
+    {
+      "policy_id": "pol-libertymutual-umb-1985-2000",
+      "carrier": "Liberty Mutual",
+      "policy_number": "LM-UMB-1985-2000-FF",
+      "policy_form": "UMBRELLA",
+      "triggered": "partial",
+      "allegations_implicating_coverage": [
+        "Negligent failure to identify, control, or warn of asbestos-containing materials, 1985\u20131998",
+        "Failure to warn workers of known dangers of asbestos despite scientific consensus by 1985",
+        "Strict products liability for utilization of asbestos-containing products without adequate safety controls"
+      ],
+      "coverage_grant_basis": "Umbrella follows form of underlying primaries via endorsement UMB-FF. Coverage depends on whether underlying primaries are triggered. Aetna (1985\u20131990) and Travelers (1990\u20131995) are triggered; Hartford (1995\u20132000) is not triggered due to absolute pollution exclusion.",
+      "exclusions_considered": [
+        {
+          "label": "Follow-form to underlying primaries",
+          "applies": true,
+          "rationale": "Umbrella excludes coverage for periods where all underlying policies are excluded. For 1995\u20131998, only Hartford (excluded) and Liberty Mutual umbrella apply. No underlying primary is triggered for this tail; umbrella follows form and is therefore excluded for 1995\u20131998."
+        }
+      ],
+      "rationale": "Liberty Mutual is partially triggered. The umbrella follows form and is triggered for 1985\u20131990 (Aetna) and 1990\u20131995 (Travelers) where underlying primaries are triggered. However, for 1995\u20131998, Hartford's absolute pollution exclusion bars coverage, so no underlying primary is triggered; umbrella follows form and is excluded for this tail. Mixed-trigger situation."
+    }
+  ],
+  "priority_analysis": {
+    "ordered_policies": [
+      {
+        "policy_id": "pol-aetna-cgl-1985",
+        "carrier": "Aetna",
+        "policy_number": "AET-CGL-1985-001",
+        "rank": "co-primary",
+        "rank_basis": "Both Aetna and Travelers contain pure-excess Other Insurance clauses for their respective periods. Under New York law, when two occurrence-based CGL policies each claim excess-over-other status, the clauses are mutually repugnant and disregarded. For long-tail asbestos loss spanning 1985\u20131995, policies are prorated by time-on-risk. Aetna covers 1985\u20131990 (5 years); Travelers covers 1990\u20131995 (5 years). Each is co-primary for its respective period.",
+        "other_insurance_quote": "If other valid and collectible insurance applies to a loss also covered by this policy, this insurance shall be excess over such other insurance, whether such other insurance is stated to be primary, contributing, excess, contingent, or otherwise.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-travelers-cgl-1990",
+        "carrier": "Travelers",
+        "policy_number": "TRV-CGL-1990-002",
+        "rank": "co-primary",
+        "rank_basis": "Co-primary with Aetna under time-on-risk pro-rata allocation. Both contain pure-excess clauses, rendering them mutually repugnant under New York law. Travelers covers 1990\u20131995 (5 years) on a pro-rata basis.",
+        "other_insurance_quote": "This insurance is excess over any other valid and collectible insurance available to the insured, whether such other insurance is primary, excess, contingent, or on any other basis.",
+        "other_insurance_type": "EXCESS_OVER_OTHER"
+      },
+      {
+        "policy_id": "pol-libertymutual-umb-1985-2000",
+        "carrier": "Liberty Mutual",
+        "policy_number": "LM-UMB-1985-2000-FF",
+        "rank": "excess",
+        "rank_basis": "Umbrella attaches above all underlying CGL primaries once underlying limits are exhausted. Attachment point is $1,000,000 per occurrence. Umbrella explicitly reserves excess status and non-contribution clause; it does not serve as primary to underlying CGL policies.",
+        "other_insurance_quote": "This insurance is excess over, and shall not contribute with, any other insurance available to the insured, whether primary, excess, contingent or on any other basis.",
+        "other_insurance_type": "EXCESS"
+      }
+    ],
+    "mutually_repugnant_groups": [
+      {
+        "policy_ids": [
+          "pol-aetna-cgl-1985",
+          "pol-travelers-cgl-1990"
+        ],
+        "reason": "Both Aetna and Travelers contain pure-excess Other Insurance clauses ('this insurance shall be excess over such other insurance'). Each claims excess status relative to the other, rendering the clauses mutually repugnant under New York law.",
+        "default_rule": "Clauses are disregarded; policies are treated as co-primary and allocated pro-rata by time-on-risk. Aetna responds for 1985\u20131990; Travelers for 1990\u20131995. Each exhausts its $1,000,000 per-occurrence and $2,000,000 general aggregate limits for its respective period before the other responds."
+      }
+    ],
+    "rule_applied": "New York reads competing 'Other Insurance' clauses together and seeks to give effect to each where possible. When two or more policies covering the same loss each contain pure-excess Other Insurance clauses, the clauses are treated as mutually repugnant and disregarded; the policies are then prorated, typically by limits or by time-on-risk depending on the loss type. For long-tail losses spanning multiple policy years, New York follows pro-rata allocation by time-on-risk among triggered primaries.",
+    "rule_citation": "Consol. Edison Co. of N.Y. v. Allstate Ins. Co., 98 N.Y.2d 208 (2002)"
+  },
+  "exhaustion_analysis": {
+    "rule": "vertical",
+    "rationale": "New York applies vertical exhaustion. Under this rule, once primary policies (Aetna for 1985\u20131990 and Travelers for 1990\u20131995) are exhausted, the excess umbrella attaches at the $1,000,000 attachment point, without regard to whether coverage for later policy years (e.g., Hartford 1995\u20132000) is triggered or excluded. The insured stacks coverage period by period; the umbrella sits above the entire primary stack, not alongside it.",
+    "rule_citation": "In re Viking Pump, Inc., 27 N.Y.3d 244 (2016)"
+  },
+  "narrative": "Plaintiff's asbestos-exposure claims are triggered under New York's continuous-trigger doctrine for long-tail bodily injury. Three of four policies are triggered: Aetna CGL (1985\u20131990), Travelers CGL (1990\u20131995), and Liberty Mutual umbrella (1985\u20132000, partially). Hartford CGL (1995\u20132000) is not triggered; its absolute pollution exclusion bars all allegations regardless of whether release was accidental. The allegations\u2014negligence, failure-to-warn, and strict products liability for asbestos-containing materials\u2014fall plainly within the bodily-injury coverage grants of Aetna and Travelers, and no qualified exception applies. Liberty Mutual's umbrella is partially triggered because it follows form of underlying primaries; it is triggered for 1985\u20131995 (where Aetna and Travelers respond) but follows form into exclusion for 1995\u20131998 (where Hartford is excluded).\n\nAmong triggered policies, priority is resolved by applying New York's mutually-repugnant doctrine. Both Aetna and Travelers contain pure-excess Other Insurance clauses, rendering them mutually repugnant. New York disregards both clauses and allocates pro-rata by time-on-risk: Aetna is co-primary for 1985\u20131990; Travelers is co-primary for 1990\u20131995. Each exhausts its per-occurrence and general-aggregate limits for its period before the other responds. Liberty Mutual umbrella ranks as excess, attaching above the underlying primaries at $1,000,000 per occurrence. Vertical exhaustion applies: once Aetna and Travelers are exhausted, Liberty Mutual attaches, regardless of Hartford's exclusion in the tail years."
+}
