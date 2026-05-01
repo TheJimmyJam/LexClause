@@ -21,10 +21,42 @@
 import {
   Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType,
   Table, TableRow, TableCell, WidthType, BorderStyle, ShadingType,
-  PageNumber, Header, Footer,
+  PageNumber, Header, Footer, ImageRun,
 } from 'docx'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+
+// ── Logo loading (run once per export, used by both DOCX and PDF) ───────────
+const LOGO_URL = '/logo-icon.png'
+
+async function loadLogoForExport() {
+  // Returns { buffer, dataUrl, width, height } — null fields if fetch fails.
+  // We try to keep memo generation robust: if the logo can't be loaded we
+  // fall back to text-only letterhead rather than crash the export.
+  try {
+    const res = await fetch(LOGO_URL)
+    if (!res.ok) throw new Error(`logo fetch failed: ${res.status}`)
+    const blob = await res.blob()
+    const buffer = await blob.arrayBuffer()
+    const dataUrl = await new Promise((resolve, reject) => {
+      const r = new FileReader()
+      r.onload  = () => resolve(r.result)
+      r.onerror = () => reject(new Error('FileReader failed'))
+      r.readAsDataURL(blob)
+    })
+    // Decode width/height from the image so we can preserve aspect ratio
+    const dims = await new Promise((resolve) => {
+      const img = new Image()
+      img.onload  = () => resolve({ w: img.naturalWidth, h: img.naturalHeight })
+      img.onerror = () => resolve({ w: 0, h: 0 })
+      img.src = dataUrl
+    })
+    return { buffer, dataUrl, width: dims.w, height: dims.h }
+  } catch (e) {
+    console.warn('Logo unavailable for memo export:', e)
+    return { buffer: null, dataUrl: null, width: 0, height: 0 }
+  }
+}
 
 // ── Brand palette (matches index.css :root brand tokens) ────────────────────
 const BRAND_HEX  = '2563EB'   // brand-600
@@ -147,6 +179,7 @@ function td(text, opts = {}) {
 
 // ── DOCX build ──────────────────────────────────────────────────────────────
 export async function buildMemoDocx({ analysis, matter, results, organization }) {
+  const logo = await loadLogoForExport()
   const allResults = (results || []).slice().sort((a, b) => (a.ordering ?? 0) - (b.ordering ?? 0))
   const triggered  = allResults.filter(r => r.triggered === 'yes' || r.triggered === 'partial')
   const orderedPriority = triggered
@@ -313,6 +346,24 @@ export async function buildMemoDocx({ analysis, matter, results, organization })
         ] }),
       },
       children: [
+        // ── Letterhead: logo + brand wordmark + tagline ──────────────────
+        ...(logo.buffer ? [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 60 },
+            children: [
+              new ImageRun({
+                data: logo.buffer,
+                transformation: { width: 64, height: 64 },
+              }),
+            ],
+          }),
+        ] : []),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 20 },
+          children: [new TextRun({ text: 'LexClause', bold: true, font: 'Cambria', size: 36, color: BRAND_HEX })] }),
+        new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 320 },
+          children: [new TextRun({ text: 'COVERAGE PRIORITY ENGINE', font: 'Calibri', size: 16, color: SOFT_HEX, characterSpacing: 60 })] }),
+
         // ── Title block
         new Paragraph({ alignment: AlignmentType.CENTER, spacing: { after: 80 },
           children: [new TextRun({ text: 'COVERAGE OPINION', bold: true, font: 'Calibri', size: 40, color: DARK_HEX })] }),
@@ -416,7 +467,8 @@ function pdfFooter(doc) {
   doc.text(`Page ${page}`, w / 2, h - 8, { align: 'center' })
 }
 
-export function buildMemoPdf({ analysis, matter, results, organization }) {
+export async function buildMemoPdf({ analysis, matter, results, organization }) {
+  const logo = await loadLogoForExport()
   const allResults = (results || []).slice().sort((a, b) => (a.ordering ?? 0) - (b.ordering ?? 0))
   const triggered  = allResults.filter(r => r.triggered === 'yes' || r.triggered === 'partial')
   const orderedPriority = triggered
@@ -430,9 +482,22 @@ export function buildMemoPdf({ analysis, matter, results, organization }) {
   const doc = new jsPDF({ unit: 'pt', format: 'letter' })
   const pageW = doc.internal.pageSize.getWidth()
   const margin = 54
-  let y = 72
+  let y = 60
 
   pdfHeader(doc, matter)
+
+  // Letterhead: logo + wordmark + tagline (centered)
+  if (logo.dataUrl) {
+    const logoSize = 48
+    doc.addImage(logo.dataUrl, 'PNG', (pageW - logoSize) / 2, y, logoSize, logoSize)
+    y += logoSize + 10
+  }
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...BRAND)
+  doc.text('LexClause', pageW / 2, y, { align: 'center' })
+  y += 12
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...SOFT)
+  doc.text('COVERAGE  PRIORITY  ENGINE', pageW / 2, y, { align: 'center', charSpace: 1.5 })
+  y += 28
 
   // Title block
   doc.setFont('helvetica', 'bold'); doc.setFontSize(24); doc.setTextColor(...DARK)
@@ -673,7 +738,7 @@ export function buildMemoPdf({ analysis, matter, results, organization }) {
   return doc
 }
 
-export function downloadMemoPdf(input) {
-  const doc = buildMemoPdf(input)
+export async function downloadMemoPdf(input) {
+  const doc = await buildMemoPdf(input)
   doc.save(`LexClause_Opinion_${safeFilename(input.matter.name)}.pdf`)
 }
