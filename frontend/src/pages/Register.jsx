@@ -1,6 +1,7 @@
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
-import { Shield } from 'lucide-react'
+import { Shield, Users } from 'lucide-react'
+import { useEffect } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { AuthShell } from './Login.jsx'
 import toast from 'react-hot-toast'
@@ -8,28 +9,38 @@ import toast from 'react-hot-toast'
 const DISCLAIMER_VERSION = 'v1'
 
 export default function Register() {
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm()
+  const { register, handleSubmit, formState: { errors, isSubmitting }, watch, setValue } = useForm()
   const navigate = useNavigate()
   const acknowledged = watch('disclaimer')
+  const [params] = useSearchParams()
+  const inviteToken = params.get('invite') || null
+  const inviteEmail = params.get('email')  || null
+  const isInvited   = !!inviteToken
+
+  // Prefill email when arriving from an invite link
+  useEffect(() => {
+    if (inviteEmail) setValue('email', inviteEmail)
+  }, [inviteEmail, setValue])
 
   const onSubmit = async ({ email, password, firstName, lastName, orgName, disclaimer }) => {
     if (!disclaimer) {
       toast.error('You must acknowledge the disclaimer to create an account.')
       return
     }
+    const meta = {
+      first_name:               firstName,
+      last_name:                lastName,
+      org_name:                 orgName,
+      source_app:               'lexclause',
+      disclaimer_acknowledged:  true,
+      disclaimer_version:       DISCLAIMER_VERSION,
+    }
+    if (inviteToken) meta.invite_token = inviteToken
+
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        data: {
-          first_name:               firstName,
-          last_name:                lastName,
-          org_name:                 orgName,
-          source_app:               'lexclause',
-          disclaimer_acknowledged:  true,
-          disclaimer_version:       DISCLAIMER_VERSION,
-        }
-      }
+      options: { data: meta }
     })
     if (error) { toast.error(error.message); return }
 
@@ -43,9 +54,18 @@ export default function Register() {
   return (
     <AuthShell
       title="Create Account"
-      subtitle="Trigger · priority · exhaustion — for every matter."
+      subtitle={isInvited ? "You've been invited — finish creating your account." : "Trigger · priority · exhaustion — for every matter."}
       wide
     >
+      {isInvited && (
+        <div className="rounded-lg border border-brand-200 bg-brand-50/60 p-3 mb-4 flex items-start gap-2">
+          <Users className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+          <div className="text-xs text-slate-700 leading-relaxed">
+            You're joining an existing organization on LexClause. The organization name field below is
+            ignored — you'll be added to the inviting org automatically.
+          </div>
+        </div>
+      )}
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="grid grid-cols-2 gap-3">
           <div>
