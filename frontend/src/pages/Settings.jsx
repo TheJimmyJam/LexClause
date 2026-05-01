@@ -200,7 +200,7 @@ function NewOrgModal({ onClose }) {
 
   const submit = async (e) => {
     e.preventDefault()
-    if (!name.trim() || !email.trim() || busy) return
+    if (!name.trim() || busy) return
     setBusy(true)
     try {
       // 1. Create the new org (super admin RLS allows the insert)
@@ -211,24 +211,30 @@ function NewOrgModal({ onClose }) {
         .single()
       if (orgErr || !org) throw new Error(orgErr?.message || 'Could not create organization')
 
-      // 2. Invite the first admin into the new org via the existing edge function
-      const { data: inv, error: invErr } = await supabase.functions.invoke('team-invite', {
-        body: {
-          email:         email.trim().toLowerCase(),
-          role:          'admin',
-          app_url:       APP_URL,
-          target_org_id: org.id,
-        },
-      })
-      if (invErr) throw invErr
-      if (inv?.error) throw new Error(inv.error)
+      // 2. Optionally invite the first admin if an email was provided.
+      //    Empty email → org sits empty until invited later from /admin.
+      let inviteResult = null
+      if (email.trim()) {
+        const { data: inv, error: invErr } = await supabase.functions.invoke('team-invite', {
+          body: {
+            email:         email.trim().toLowerCase(),
+            role:          'admin',
+            app_url:       APP_URL,
+            target_org_id: org.id,
+          },
+        })
+        if (invErr) throw invErr
+        if (inv?.error) throw new Error(inv.error)
+        inviteResult = inv
+      }
 
-      const sent = inv?.email_sent
-      toast.success(
-        sent
-          ? `Created ${org.name} and emailed admin invite to ${email.trim()}`
-          : `Created ${org.name} (invite created — email status: ${inv?.send_error?.slice(0, 100) || 'unknown'})`
-      )
+      if (!inviteResult) {
+        toast.success(`Created ${org.name} (empty — invite an admin from /admin when ready)`)
+      } else if (inviteResult.email_sent) {
+        toast.success(`Created ${org.name} and emailed admin invite to ${email.trim()}`)
+      } else {
+        toast.success(`Created ${org.name} (invite created — email status: ${inviteResult.send_error?.slice(0, 100) || 'unknown'})`)
+      }
       onClose()
       navigate('/admin')
     } catch (e) {
@@ -286,16 +292,21 @@ function NewOrgModal({ onClose }) {
               />
             </div>
             <div>
-              <label className="form-label">First admin email</label>
+              <label className="form-label">
+                First admin email <span className="text-slate-400 font-normal">(optional)</span>
+              </label>
               <input
-                type="email" required
+                type="email"
                 placeholder="admin@firm.com"
                 className="form-input"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
               />
-              <p className="text-[11px] text-slate-500 mt-1">
-                They'll receive an invite email and become the org's first admin when they accept.
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                {email.trim()
+                  ? <>They'll receive an invite email and become the org's first admin when they accept.</>
+                  : <>Leave blank to create an empty org. You can invite an admin later from{' '}
+                      <span className="text-brand-700 font-medium">/admin</span>.</>}
               </p>
             </div>
 
@@ -303,12 +314,16 @@ function NewOrgModal({ onClose }) {
               <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
               <button
                 type="submit"
-                disabled={busy || !name.trim() || !email.trim()}
+                disabled={busy || !name.trim()}
                 className="btn-primary"
                 style={{ fontVariant: 'all-small-caps' }}
               >
-                {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                {busy ? 'Creating…' : 'Create &amp; invite admin'}
+                {busy
+                  ? <Loader2 className="h-4 w-4 animate-spin" />
+                  : (email.trim() ? <Mail className="h-4 w-4" /> : <Plus className="h-4 w-4" />)}
+                {busy
+                  ? 'Creating…'
+                  : (email.trim() ? 'Create & invite admin' : 'Create empty org')}
               </button>
             </div>
           </form>
