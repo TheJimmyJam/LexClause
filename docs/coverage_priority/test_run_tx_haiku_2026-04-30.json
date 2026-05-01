@@ -1,0 +1,114 @@
+{
+  "trigger_analysis": [
+    {
+      "policy_id": "pol-cgl-libertymutual-001",
+      "carrier": "Liberty Mutual",
+      "policy_number": "LM-CGL-2024-7788",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "partial",
+      "allegations_implicating_coverage": [
+        "Count 2: Plaintiff's tenant inhaled diesel fumes during cleanup, suffering respiratory injury (bodily injury).",
+        "Count 3: Gross negligence allegation supporting punitive damages (underlying negligent conduct same as Count 1)."
+      ],
+      "coverage_grant_basis": "The CGL occurrence policy provides coverage for 'bodily injury' occurring during the policy period. The loss_start_date of 2024-08-15 falls within the effective period (2024-01-01 to 2025-01-01). Bodily injury from inhalation of diesel fumes is a classic bodily-injury claim.",
+      "exclusions_considered": [
+        {
+          "label": "Pollution Exclusion (CG 21 49)",
+          "applies": true,
+          "rationale": "The exclusion bars coverage for bodily injury 'which would not have occurred in whole or part but for the actual, alleged or threatened discharge, dispersal, seepage, migration, release or escape of pollutants.' The bodily injury (respiratory injury from inhaling diesel fumes) would not have occurred but for the discharge and dispersal of diesel pollutants. The inhalation of fumes during cleanup is causally tied to the release. However, under the eight-corners rule, if the complaint's allegations of negligent maintenance and operation of the generator do not necessarily require proof of a 'discharge, dispersal, seepage, migration, release or escape' as the underlying cause, ambiguity may exist. On balance, the respiratory-injury count is barred by the pollution exclusion because the harm flows directly from the release of pollutants."
+        }
+      ],
+      "rationale": "Under the eight-corners rule, the duty to defend is triggered if any allegation potentially falls within coverage and is not clearly barred by an exclusion. Count 2 (bodily injury from fume inhalation) nominally falls within the bodily-injury coverage grant for an occurrence happening during the policy period. However, the Pollution Exclusion (CG 21 49) expressly bars bodily injury that would not have occurred but for the discharge or release of pollutants. Because the respiratory injury is causally dependent on the release and dispersal of diesel fumes, the exclusion applies. Count 1 (property damage from the spill itself) is also barred by the same pollution exclusion. Count 3 (punitive damages) is derivative of the underlying negligence allegations. Consequently, the Liberty Mutual CGL is triggered only as to Count 2 (bodily injury from fume inhalation) on a technical read that the policy covers 'bodily injury' during the period, but the Pollution Exclusion operates to exclude the actual harm alleged. This is a partial trigger situation: the coverage grant is nominally implicated, but an applicable exclusion bars the specific claim."
+    },
+    {
+      "policy_id": "pol-cgl-travelers-002",
+      "carrier": "Travelers",
+      "policy_number": "TRV-CGL-2024-4421",
+      "policy_form": "CGL_OCCURRENCE",
+      "triggered": "partial",
+      "allegations_implicating_coverage": [
+        "Count 2: Bodily injury from inhalation of diesel fumes."
+      ],
+      "coverage_grant_basis": "The CGL occurrence policy provides coverage for bodily injury occurring during the policy period (2024-03-01 to 2025-03-01). The loss occurred 2024-08-15, within the policy period.",
+      "exclusions_considered": [
+        {
+          "label": "Pollution Exclusion (CG 21 49)",
+          "applies": true,
+          "rationale": "Identical to Liberty Mutual's exclusion. The respiratory injury would not have occurred but for the release and dispersal of diesel pollutants, so the exclusion bars coverage."
+        }
+      ],
+      "rationale": "Under the eight-corners rule and applying the same pollution-exclusion analysis, Count 2 (bodily injury from fume inhalation) nominally falls within the bodily-injury coverage grant for the policy period, but the Pollution Exclusion (CG 21 49) bars the claim because the harm is causally dependent on the release of pollutants. Travelers' CGL is triggered as a partial-trigger policy: the coverage grant applies, but the pollution exclusion operates to exclude the specific loss alleged."
+    },
+    {
+      "policy_id": "pol-cpl-zurich-003",
+      "carrier": "Zurich",
+      "policy_number": "ZUR-CPL-2024-9933",
+      "policy_form": "POLLUTION_CONTRACTOR",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Count 1: Negligent spill of 200 gallons of diesel fuel, contaminating Plaintiff's adjoining property (property damage\u2014pollution).",
+        "Count 2: Bodily injury from inhalation of diesel fumes during cleanup."
+      ],
+      "coverage_grant_basis": "A Contractor's Pollution Liability policy is designed to cover pollution claims that CGL policies exclude. The policy covers bodily injury and property damage arising from pollution conditions (release, discharge, dispersal, seepage, migration of pollutants). Both the diesel spill (property damage) and the inhalation injury (bodily injury) are causally tied to the release of diesel pollutants and are well within the intended coverage of a CPL form.",
+      "exclusions_considered": [
+        {
+          "label": "Known conditions exclusion",
+          "applies": false,
+          "rationale": "The exclusion bars coverage for pollution conditions 'known to the insured prior to the inception of the policy period.' The spill occurred on 2024-08-15, during the policy period (2024-01-01 to 2025-01-01), and there is no allegation that Greenfield Builders knew of a diesel discharge before the policy incepted. The condition is newly discovered/occurring, not a pre-existing known condition."
+        }
+      ],
+      "rationale": "Under the eight-corners rule, Count 1 (property damage from the diesel spill) and Count 2 (bodily injury from fume inhalation) both clearly fall within the coverage grant of a Contractor's Pollution Liability policy. The known-conditions exclusion does not apply because the spill is alleged to have occurred during the policy period and is not described as a pre-existing known condition. The Zurich CPL is fully triggered by Counts 1 and 2."
+    },
+    {
+      "policy_id": "pol-umb-travelers-004",
+      "carrier": "Travelers",
+      "policy_number": "TRV-UMB-2024-5562",
+      "policy_form": "UMBRELLA",
+      "triggered": "yes",
+      "allegations_implicating_coverage": [
+        "Count 1: Property damage from diesel spill (pollution).",
+        "Count 2: Bodily injury from inhalation of diesel fumes."
+      ],
+      "coverage_grant_basis": "An Umbrella policy provides coverage excess over underlying primary policies. The policy's follow-form endorsement (UMB-FF-001) means it follows the terms, conditions, and exclusions of the underlying primary policy. The Umbrella policy form does not itself exclude pollution claims. Coverage attaches once the underlying primary is exhausted, and the Umbrella follows the same coverage terms.",
+      "exclusions_considered": [
+        {
+          "label": "No pollution exclusion in the Umbrella form itself",
+          "applies": false,
+          "rationale": "The Umbrella policy does not list a pollution exclusion. It incorporates the underlying policy's exclusions via the follow-form endorsement. Because the underlying CPL (Zurich) covers the pollution claims, the Umbrella will follow form and cover them once attached."
+        }
+      ],
+      "rationale": "Under the eight-corners rule and the follow-form endorsement, the Umbrella policy is triggered for Counts 1 and 2 because it follows the terms of the underlying primary policies. Although the Umbrella has an attachment point ($1,000,000) and will not respond until primary coverage is exhausted, it is triggered as to coverage for the allegations. The policy's four corners do not exclude pollution claims; the follow-form endorsement means it defers to the underlying policy's treatment."
+    }
+  ],
+  "priority_analysis": {
+    "ordered_policies": [
+      {
+        "policy_id": "pol-cpl-zurich-003",
+        "carrier": "Zurich",
+        "policy_number": "ZUR-CPL-2024-9933",
+        "rank": "primary",
+        "rank_basis": "The Zurich Contractor's Pollution Liability policy has a silent Other Insurance clause (SILENT) and is the first-line coverage for pollution losses. For pollution-type claims, CPL policies are typically the closest-to-the-risk and are primary to CGLs (which exclude pollution via CG 21 49) and to Umbrellas (which are excess by form). Texas priority rule requires giving effect to clear policy language; the Zurich policy's silence defaults to primary.",
+        "other_insurance_quote": "No Other Insurance clause present (silent).",
+        "other_insurance_type": "SILENT"
+      },
+      {
+        "policy_id": "pol-umb-travelers-004",
+        "carrier": "Travelers",
+        "policy_number": "TRV-UMB-2024-5562",
+        "rank": "excess",
+        "rank_basis": "The Travelers Umbrella policy is excess by its form and its Other Insurance clause. Its attachment point of $1,000,000 means it attaches only after underlying coverage is exhausted. The follow-form endorsement requires it to follow the underlying policy's treatment. The Other Insurance clause states the policy 'is excess over, and shall not contribute with, any other insurance.' Once Zurich CPL (primary) is exhausted to its limits, the Umbrella will respond up to its $5,000,000 limit.",
+        "other_insurance_quote": "This insurance is excess over, and shall not contribute with, any other insurance, whether primary, excess, contingent, or on any other basis.",
+        "other_insurance_type": "EXCESS"
+      }
+    ],
+    "mutually_repugnant_groups": [],
+    "rule_applied": "Texas gives effect to clear and unambiguous policy language. When two or more policies cover the same loss, the priority of coverage is determined by reading each policy's Other Insurance clause and giving effect to its terms. Where a policy's Other Insurance clause is silent, that policy is primary. Where another policy contains an excess Other Insurance clause, that policy is excess to the silent policy. For pollution losses specifically, a Contractor's Pollution Liability policy (silent) is primary to a CGL (which excludes via CG 21 49) and to an Umbrella (excess by form and attachment point). The CGLs (Liberty Mutual and Travelers CGL) are excluded from the priority stack because they do not cover the pollution allegations (barred by Pollution Exclusion CG 21 49) and therefore do not 'trigger' under the eight-corners rule in a meaningful coverage sense.",
+    "rule_citation": "Mid-Continent Ins. Co. v. Liberty Mut. Ins. Co., 236 S.W.3d 765 (Tex. 2007); Trinity Universal Ins. Co. v. Employers Mut. Cas. Co., 592 F.3d 687 (5th Cir. 2010)"
+  },
+  "exhaustion_analysis": {
+    "rule": "vertical",
+    "rationale": "Texas follows a vertical exhaustion rule. Under vertical exhaustion, excess coverage attaches once the directly underlying primary policy is exhausted to its limits, regardless of whether other co-primary policies (if any existed) have been exhausted. In this matter, Zurich CPL is the sole primary policy (both CGLs are excluded by the pollution exclusion and thus do not respond). Once Zurich CPL is exhausted to its per-occurrence limit of $2,000,000 and general aggregate limit of $4,000,000 (less the $25,000 self-insured retention), the Travelers Umbrella will attach and respond up to its per-occurrence limit of $5,000,000. There is no requirement to exhaust multiple primary policies before the Umbrella is triggered. Vertical exhaustion favors the insured by allowing a vertical stack to flow as losses exceed each layer's limits.",
+    "rule_citation": "Keck, Mahin & Cate v. Nat'l Union Fire Ins. Co. of Pittsburgh, 20 S.W.3d 692 (Tex. 2000)"
+  },
+  "narrative": "Greenfield Builders LLC's insurance tower consists of four triggered or potentially triggered policies: two commercial general liability policies (Liberty Mutual and Travelers), a Contractor's Pollution Liability policy (Zurich), and an Umbrella policy (Travelers). The matter involves three overlapping allegations: (1) negligent spill of 200 gallons of diesel fuel causing property damage; (2) bodily injury from inhalation of diesel fumes during cleanup; and (3) a gross-negligence count supporting punitive damages.\n\nUnder Texas's eight-corners rule, Counts 1 and 2 nominally fall within the bodily-injury and property-damage coverage grants of both CGL policies for occurrences during their respective policy periods. However, both CGL policies contain identical Pollution Exclusions (CG 21 49) that bar coverage for bodily injury or property damage that would not have occurred but for the discharge, dispersal, seepage, migration, release, or escape of pollutants. Because both the property damage (the diesel spill itself) and the bodily injury (inhalation of diesel fumes released during the spill) are causally dependent on the release and dispersal of diesel pollutants, the Pollution Exclusion applies and excludes coverage. The CGLs are therefore excluded from the responsive tower. The Zurich Contractor's Pollution Liability policy, by contrast, is specifically designed to cover pollution claims excluded from CGLs. Counts 1 and 2 clearly fall within the CPL's coverage grant for property damage and bodily injury arising from pollution conditions; the known-conditions exclusion does not apply because the spill occurred during the policy period and is not alleged to be a pre-existing known condition. The Travelers Umbrella policy is triggered because its follow-form endorsement requires it to track the underlying policies' coverage terms and exclusions; it will respond as excess coverage once the underlying primary policies are exhausted. Count 3 (punitive damages) is derivative of the underlying negligence allegations and follows the coverage analysis for Counts 1 and 2.\n\nFor priority purposes, Texas gives effect to clear and unambiguous Other Insurance clauses. The Zurich CPL policy contains no Other Insurance clause (silent), which defaults to primary status. The Travelers Umbrella contains an express EXCESS Other Insurance clause and carries an attachment point of $1,000,000, making it excess to any primary coverage. Under vertical exhaustion, once Zurich CPL is exhausted to its per-occurrence limit of $2,000,000 and general aggregate limit of $4,000,000 (less the $25,000 self-insured retention), the Travelers Umbrella will attach and respond up to its $5,000,000 limit, without the requirement to exhaust other primary policies (no other primary policies being triggered). This structure allows the insured to exhaust Zurich's coverage first, then tap the Umbrella's excess limits, consistent with Texas's vertical-exhaustion doctrine."
+}
