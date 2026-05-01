@@ -451,7 +451,7 @@ export default function Analyzer() {
   return (
     <div className="px-6 pt-4 pb-6 lg:px-10 lg:pt-6 lg:pb-10 max-w-4xl mx-auto">
       {/* ── Header: logo lockup + serif title with brand underline ─────── */}
-      <header className="mb-5">
+      <header className="mb-9">
         <div className="flex items-center gap-3 mb-3">
           <img
             src="/logo-icon.png"
@@ -466,22 +466,20 @@ export default function Analyzer() {
           </div>
         </div>
 
-        <div className="flex items-end justify-between gap-4 flex-wrap">
-          <h1 className="font-serif-brand text-3xl lg:text-4xl tracking-tight text-slate-900 leading-none">
-            <span className="lc-title-underline uppercase">Coverage Priority</span>{' '}
-            <span className="text-slate-700">Analysis</span>
-          </h1>
-          <p
-            className="text-slate-600 text-sm tracking-wide max-w-md text-right"
-            style={{ fontVariant: 'all-small-caps' }}
-          >
-            Drop policies + lawsuit · get a citable{' '}
-            <strong className="text-brand-700">Trigger</strong> /{' '}
-            <strong className="text-brand-700">Priority</strong> /{' '}
-            <strong className="text-brand-700">Exhaustion</strong>{' '}
-            opinion.
-          </p>
-        </div>
+        <h1 className="font-serif-brand text-3xl lg:text-4xl tracking-tight text-slate-900 leading-none mb-4">
+          <span className="lc-title-underline uppercase">Coverage Priority</span>{' '}
+          <span className="text-slate-700">Analysis</span>
+        </h1>
+        <p
+          className="text-slate-600 text-lg tracking-wide leading-snug max-w-2xl"
+          style={{ fontVariant: 'all-small-caps' }}
+        >
+          Drop policies + lawsuit · get a citable{' '}
+          <strong className="text-brand-700">Trigger</strong> /{' '}
+          <strong className="text-brand-700">Priority</strong> /{' '}
+          <strong className="text-brand-700">Exhaustion</strong>{' '}
+          opinion.
+        </p>
       </header>
 
       {/* ── Drop zone: marching alternating dashes + white-over-blue split fill ── */}
