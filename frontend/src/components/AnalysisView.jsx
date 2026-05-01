@@ -16,11 +16,12 @@
 import { useState, useRef, useEffect } from 'react'
 import {
   AlertTriangle, CheckCircle2, X, Plus, ScrollText, Scale, Shield, Sparkles,
-  Download, FileText, FileType, ChevronDown,
+  Download, FileText, FileType, ChevronDown, Mail, Loader2, Send,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useAuth } from '../hooks/useAuth.jsx'
-import { downloadMemoDocx, downloadMemoPdf } from '../lib/generateCoverageMemo.js'
+import { downloadMemoDocx, downloadMemoPdf, buildMemoDocx, buildMemoPdf } from '../lib/generateCoverageMemo.js'
+import { emailOpinion } from '../lib/policyAnalysis.js'
 
 // ──────────────────────────────────────────────────────────────────────────
 // Single-state result
@@ -287,6 +288,7 @@ export function ComparisonResult({ comparison, headerActions }) {
 export function ExportMenu({ payload }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [emailOpen, setEmailOpen] = useState(false)
   const ref = useRef(null)
   useEffect(() => {
     function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
@@ -310,38 +312,311 @@ export function ExportMenu({ payload }) {
   }
 
   return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(o => !o)} disabled={busy} className="btn-primary">
-        <Download className="h-4 w-4" />
-        {busy ? 'Generating…' : 'Export opinion'}
-        <ChevronDown className="h-3.5 w-3.5 -mr-1 opacity-80" />
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-56 bg-white border border-slate-200 rounded-lg shadow-modal z-30 overflow-hidden">
-          <button
-            onClick={() => exportAs('docx')}
-            className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-brand-50 text-left"
-          >
-            <FileText className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
-            <div>
-              <div className="text-sm font-medium text-slate-900">Word (.docx)</div>
-              <div className="text-xs text-slate-500">Editable for further drafting</div>
-            </div>
-          </button>
-          <button
-            onClick={() => exportAs('pdf')}
-            className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-brand-50 text-left border-t border-slate-100"
-          >
-            <FileType className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
-            <div>
-              <div className="text-sm font-medium text-slate-900">PDF</div>
-              <div className="text-xs text-slate-500">Finalized for filing or distribution</div>
-            </div>
-          </button>
-        </div>
+    <>
+      <div className="relative" ref={ref}>
+        <button onClick={() => setOpen(o => !o)} disabled={busy} className="btn-primary">
+          <Download className="h-4 w-4" />
+          {busy ? 'Generating…' : 'Export opinion'}
+          <ChevronDown className="h-3.5 w-3.5 -mr-1 opacity-80" />
+        </button>
+        {open && (
+          <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-lg shadow-modal z-30 overflow-hidden">
+            <button
+              onClick={() => exportAs('docx')}
+              className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-brand-50 text-left"
+            >
+              <FileText className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+              <div>
+                <div className="text-sm font-medium text-slate-900">Download Word (.docx)</div>
+                <div className="text-xs text-slate-500">Editable for further drafting</div>
+              </div>
+            </button>
+            <button
+              onClick={() => exportAs('pdf')}
+              className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-brand-50 text-left border-t border-slate-100"
+            >
+              <FileType className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+              <div>
+                <div className="text-sm font-medium text-slate-900">Download PDF</div>
+                <div className="text-xs text-slate-500">Finalized for filing or distribution</div>
+              </div>
+            </button>
+            <button
+              onClick={() => { setOpen(false); setEmailOpen(true) }}
+              className="flex w-full items-start gap-3 px-3 py-2.5 hover:bg-brand-50 text-left border-t border-slate-100"
+            >
+              <Mail className="h-4 w-4 mt-0.5 text-brand-700 flex-shrink-0" />
+              <div>
+                <div className="text-sm font-medium text-slate-900">Email opinion…</div>
+                <div className="text-xs text-slate-500">Send .docx + .pdf to one or more recipients</div>
+              </div>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {emailOpen && (
+        <EmailModal
+          payload={payload}
+          onClose={() => setEmailOpen(false)}
+        />
       )}
+    </>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// EmailModal — chip-style multi-recipient input + subject + message + send
+// ──────────────────────────────────────────────────────────────────────────
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function EmailModal({ payload, onClose }) {
+  const matterName = payload?.matter?.name || payload?.analysis?.lc_matters?.name || 'Matter'
+  const govState   = payload?.analysis?.governing_state || payload?.matter?.governing_state || ''
+  const defaultSubject = `Coverage Priority Opinion · ${matterName}`
+
+  const [chips, setChips]       = useState([])
+  const [draft, setDraft]       = useState('')
+  const [subject, setSubject]   = useState(defaultSubject)
+  const [message, setMessage]   = useState('')
+  const [includeDocx, setDocx]  = useState(true)
+  const [includePdf, setPdf]    = useState(true)
+  const [sending, setSending]   = useState(false)
+
+  const inputRef = useRef(null)
+
+  const commitDraft = () => {
+    const t = draft.trim().replace(/[,;]+$/, '')
+    if (!t) return
+    if (!EMAIL_RE.test(t)) {
+      toast.error(`Not a valid email: ${t}`)
+      return
+    }
+    if (chips.includes(t.toLowerCase())) { setDraft(''); return }
+    setChips([...chips, t.toLowerCase()])
+    setDraft('')
+  }
+
+  const onKey = (e) => {
+    if (e.key === 'Enter' || e.key === ',' || e.key === ';') {
+      e.preventDefault()
+      commitDraft()
+    } else if (e.key === 'Backspace' && !draft && chips.length) {
+      setChips(chips.slice(0, -1))
+    }
+  }
+
+  const onPaste = (e) => {
+    const text = e.clipboardData.getData('text')
+    if (text.includes(',') || text.includes(';') || text.includes('\n') || text.includes(' ')) {
+      e.preventDefault()
+      const tokens = text.split(/[,;\s]+/).map(t => t.trim().toLowerCase()).filter(t => EMAIL_RE.test(t))
+      const next = Array.from(new Set([...chips, ...tokens]))
+      setChips(next)
+      setDraft('')
+    }
+  }
+
+  const removeChip = (e) => setChips(chips.filter(c => c !== e))
+
+  const canSend = chips.length > 0 && (includeDocx || includePdf) && !sending
+
+  async function handleSend() {
+    if (!canSend) return
+    // Allow trailing typed-but-uncommitted email
+    let recipients = chips
+    const tail = draft.trim()
+    if (tail && EMAIL_RE.test(tail)) {
+      recipients = Array.from(new Set([...chips, tail.toLowerCase()]))
+    }
+    setSending(true)
+    try {
+      const attachments = []
+      if (includeDocx) {
+        const blob = await buildMemoDocx(payload)
+        const b64 = await blobToBase64(blob)
+        attachments.push({
+          filename: `LexClause_Opinion_${safeName(matterName)}.docx`,
+          content_base64: b64,
+          content_type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        })
+      }
+      if (includePdf) {
+        const doc = await buildMemoPdf(payload)
+        const blob = doc.output('blob')
+        const b64 = await blobToBase64(blob)
+        attachments.push({
+          filename: `LexClause_Opinion_${safeName(matterName)}.pdf`,
+          content_base64: b64,
+          content_type: 'application/pdf',
+        })
+      }
+      const result = await emailOpinion({
+        recipients,
+        subject,
+        message,
+        matter_name: matterName,
+        governing_state: govState || undefined,
+        attachments,
+      })
+      toast.success(`Opinion emailed to ${(result?.sent_to || recipients).length} recipient${(result?.sent_to || recipients).length === 1 ? '' : 's'}`)
+      onClose()
+    } catch (e) {
+      console.error('Email send failed', e)
+      toast.error(e?.message || 'Email send failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full max-w-lg rounded-2xl shadow-2xl shadow-brand-900/40 overflow-hidden bg-white"
+        onClick={e => e.stopPropagation()}
+      >
+        <div
+          className="h-1.5"
+          style={{ background: 'linear-gradient(90deg, var(--brand-700), var(--brand-500), var(--brand-300))' }}
+          aria-hidden="true"
+        />
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between gap-3 mb-5">
+            <div>
+              <div className="text-[11px] font-semibold tracking-[0.22em] uppercase text-brand-700 mb-1">
+                LexClause
+              </div>
+              <h2 className="font-serif-brand text-2xl uppercase tracking-tight text-slate-900 leading-none">
+                Email opinion
+              </h2>
+            </div>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 -mr-1 -mt-1">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Recipients (chip input) */}
+            <div>
+              <label className="form-label">Recipients</label>
+              <div
+                className="form-input flex flex-wrap items-center gap-1.5 cursor-text min-h-[42px]"
+                onClick={() => inputRef.current?.focus()}
+              >
+                {chips.map(c => (
+                  <span
+                    key={c}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand-100 text-brand-800 text-xs font-medium border border-brand-200"
+                  >
+                    {c}
+                    <button
+                      onClick={() => removeChip(c)}
+                      className="hover:text-brand-900 -mr-0.5"
+                      aria-label={`Remove ${c}`}
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </span>
+                ))}
+                <input
+                  ref={inputRef}
+                  type="email"
+                  className="flex-1 min-w-[8rem] outline-none bg-transparent text-sm py-0.5"
+                  placeholder={chips.length === 0 ? 'a@firm.com, b@firm.com' : ''}
+                  value={draft}
+                  onChange={e => setDraft(e.target.value)}
+                  onKeyDown={onKey}
+                  onBlur={commitDraft}
+                  onPaste={onPaste}
+                />
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1">
+                Press Enter, comma, or semicolon to add. Up to 25 recipients per send.
+              </p>
+            </div>
+
+            {/* Subject */}
+            <div>
+              <label className="form-label">Subject</label>
+              <input
+                type="text"
+                className="form-input"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
+              />
+            </div>
+
+            {/* Optional cover note */}
+            <div>
+              <label className="form-label">Message <span className="text-slate-400 font-normal">(optional)</span></label>
+              <textarea
+                rows={3}
+                className="form-input resize-none"
+                placeholder="Optional cover note. Appears above the attached opinion in the email body."
+                value={message}
+                onChange={e => setMessage(e.target.value)}
+              />
+            </div>
+
+            {/* Attachment toggles */}
+            <div>
+              <div className="form-label">Attach</div>
+              <div className="flex items-center gap-4 text-sm">
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includeDocx}
+                    onChange={e => setDocx(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-slate-700">Word (.docx)</span>
+                </label>
+                <label className="inline-flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={includePdf}
+                    onChange={e => setPdf(e.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                  />
+                  <span className="text-slate-700">PDF</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 mt-6 pt-5 border-t border-slate-100">
+            <button onClick={onClose} className="btn-secondary">Cancel</button>
+            <button
+              onClick={handleSend}
+              disabled={!canSend}
+              className="btn-primary"
+              style={{ fontVariant: 'all-small-caps' }}
+            >
+              {sending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              {sending ? 'Sending…' : `Send to ${chips.length || 0}`}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
+}
+
+function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader()
+    r.onload  = () => {
+      const dataUrl = String(r.result || '')
+      const idx = dataUrl.indexOf(',')
+      resolve(idx >= 0 ? dataUrl.slice(idx + 1) : dataUrl)
+    }
+    r.onerror = () => reject(new Error('FileReader failed'))
+    r.readAsDataURL(blob)
+  })
+}
+
+function safeName(s) {
+  return String(s || 'matter').replace(/[^a-z0-9_\-]+/gi, '_').slice(0, 80)
 }
 
 function Section({ icon, title, tag, children }) {
