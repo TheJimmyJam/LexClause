@@ -7,6 +7,7 @@ import Landing        from './pages/Landing.jsx'
 import Login          from './pages/Login.jsx'
 import Register       from './pages/Register.jsx'
 import ForgotPassword from './pages/ForgotPassword.jsx'
+import Analyzer       from './pages/Analyzer.jsx'
 import Dashboard      from './pages/Dashboard.jsx'
 import Policies       from './pages/Policies.jsx'
 import PolicyDetail   from './pages/PolicyDetail.jsx'
@@ -28,7 +29,7 @@ function ProtectedRoute({ children }) {
 function PublicRoute({ children }) {
   const { user, loading } = useAuth()
   if (loading) return null
-  if (user) return <Navigate to="/dashboard" replace />
+  if (user) return <Navigate to="/analyze" replace />
   return children
 }
 
@@ -58,6 +59,10 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+          {/* v0.3 — primary one-shot Analyzer */}
+          <Route path="/analyze"                 element={<Analyzer />} />
+
+          {/* History / admin (legacy pages, reachable but de-emphasized) */}
           <Route path="/dashboard"               element={<Dashboard />} />
           <Route path="/policies"                element={<Policies />} />
           <Route path="/policies/upload"         element={<PolicyUpload />} />
@@ -70,7 +75,8 @@ export default function App() {
           <Route path="/settings"                element={<Settings />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        {/* Default authenticated landing → Analyzer */}
+        <Route path="*" element={<Navigate to="/analyze" replace />} />
       </Routes>
     </AuthProvider>
   )
