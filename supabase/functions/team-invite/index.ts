@@ -16,9 +16,10 @@
 //
 // Request body:
 //   {
-//     email: string,           // invitee email
-//     role:  'admin'|'member',
-//     app_url: string,         // base URL to embed in the invite link (e.g. https://lexclause.netlify.app)
+//     email:          string,             // invitee email
+//     role:           'admin'|'member',
+//     app_url:        string,             // base URL embedded in the link
+//     target_org_id?: string,             // OPTIONAL — only honored if caller is in lc_super_admins
 //   }
 //
 // Response:
@@ -94,7 +95,7 @@ serve(async (req) => {
     if (!authHeader) throw new Error('Authentication required')
 
     const body = await req.json()
-    const { email, role, app_url } = body || {}
+    const { email, role, app_url, target_org_id } = body || {}
 
     if (!email || !EMAIL_RE.test(String(email).trim())) {
       throw new Error('A valid recipient email is required')
@@ -118,30 +119,49 @@ serve(async (req) => {
     if (userErr || !userResp?.user) throw new Error('Could not identify the caller')
     const callerId = userResp.user.id
 
-    // Pull the caller's profile + org. We only allow admins to invite.
+    // Pull the caller's profile + check super admin status
     const { data: callerProfile, error: profErr } = await admin
       .from('lc_profiles')
       .select('id, org_id, role, first_name, last_name, email')
       .eq('id', callerId)
       .single()
     if (profErr || !callerProfile) throw new Error('Caller profile not found')
-    if (callerProfile.role !== 'admin') throw new Error('Only org admins can send invitations')
 
-    const { data: org } = await admin
+    const { data: superAdminRow } = await admin
+      .from('lc_super_admins')
+      .select('user_id')
+      .eq('user_id', callerId)
+      .maybeSingle()
+    const isSuperAdmin = !!superAdminRow
+
+    // Determine which org the invitation targets.
+    //   - Super admin + target_org_id → invite into that org
+    //   - Otherwise → caller must be an admin of their own org and we use that org_id
+    let invitingOrgId
+    if (target_org_id && isSuperAdmin) {
+      invitingOrgId = target_org_id
+    } else if (callerProfile.role === 'admin') {
+      invitingOrgId = callerProfile.org_id
+    } else {
+      throw new Error('Only org admins (or super admins specifying target_org_id) can send invitations')
+    }
+
+    const { data: org, error: orgErr } = await admin
       .from('lc_organizations')
       .select('id, name')
-      .eq('id', callerProfile.org_id)
+      .eq('id', invitingOrgId)
       .single()
+    if (orgErr || !org) throw new Error('Target organization not found')
 
     const inviterName = [callerProfile.first_name, callerProfile.last_name].filter(Boolean).join(' ') || callerProfile.email || 'A colleague'
-    const orgName     = org?.name || 'your organization'
+    const orgName     = org.name || 'your organization'
     const inviteEmail = String(email).trim().toLowerCase()
 
     // Insert the invitation. If the same email has a pending invite, supersede it
     // by revoking the prior one rather than stacking.
     await admin.from('lc_invitations')
       .update({ revoked_at: new Date().toISOString() })
-      .eq('org_id', callerProfile.org_id)
+      .eq('org_id', invitingOrgId)
       .eq('email',  inviteEmail)
       .is('accepted_at', null)
       .is('revoked_at',  null)
@@ -149,7 +169,7 @@ serve(async (req) => {
     const { data: inv, error: insErr } = await admin
       .from('lc_invitations')
       .insert({
-        org_id:     callerProfile.org_id,
+        org_id:     invitingOrgId,
         email:      inviteEmail,
         role,
         invited_by: callerId,
