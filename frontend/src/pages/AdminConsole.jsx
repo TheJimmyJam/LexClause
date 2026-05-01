@@ -11,8 +11,7 @@ import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Navigate, Link } from 'react-router-dom'
 import {
-  Shield, Users, FileText, Scale, AlertTriangle, ChevronDown, Search, ArrowLeft,
-  Mail, UserPlus, Loader2, Copy,
+  Shield, Users, FileText, Scale, ChevronDown, Search, ArrowLeft, Copy,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { supabase } from '../lib/supabase.js'
@@ -316,16 +315,6 @@ function OrgDetails({ org }) {
         </div>
       </div>
 
-      {/* Super-admin invite form — pre-targeted to this org */}
-      <OrgInviteForm
-        orgId={org.id}
-        orgName={org.name}
-        onInvited={() => {
-          refetchInvites()
-          qc.invalidateQueries({ queryKey: ['lc_admin_orgs'] })
-        }}
-      />
-
       {/* Pending invitations for this org */}
       {pendingInvites.length > 0 && (
         <div className="mt-4 pt-4 border-t border-slate-200">
@@ -359,79 +348,6 @@ function OrgDetails({ org }) {
   )
 }
 
-function OrgInviteForm({ orgId, orgName, onInvited }) {
-  const [email, setEmail] = useState('')
-  const [role,  setRole]  = useState('member')
-  const [busy,  setBusy]  = useState(false)
-
-  const submit = async (e) => {
-    e.preventDefault()
-    if (!email.trim() || busy) return
-    setBusy(true)
-    try {
-      const { data, error } = await supabase.functions.invoke('team-invite', {
-        body: {
-          email:         email.trim().toLowerCase(),
-          role,
-          app_url:       APP_URL,
-          target_org_id: orgId,
-        },
-      })
-      if (error) throw error
-      if (data?.error) throw new Error(data.error)
-      if (data?.email_sent) {
-        toast.success(`Invited ${email.trim()} to ${orgName || 'this org'}`)
-      } else if (data?.send_error) {
-        toast.error(`Invite created but email failed: ${data.send_error.slice(0, 200)}`)
-      } else {
-        toast.success(`Invitation created for ${email.trim()}`)
-      }
-      setEmail('')
-      setRole('member')
-      onInvited?.()
-    } catch (e) {
-      toast.error(e?.message || 'Could not send invitation')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <div className="rounded-lg border border-amber-200 bg-amber-50/40 p-3">
-      <h4 className="text-[10px] uppercase tracking-[0.18em] text-amber-700 font-semibold mb-2 flex items-center gap-1.5">
-        <UserPlus className="h-3.5 w-3.5" />
-        Invite to <span className="text-amber-900 font-bold">{orgName || 'this org'}</span> (god-mode)
-      </h4>
-      <form onSubmit={submit} className="grid sm:grid-cols-[1fr_120px_auto] gap-2 items-start">
-        <input
-          type="email" required placeholder="email@firm.com"
-          className="form-input text-xs"
-          value={email}
-          onChange={e => setEmail(e.target.value)}
-        />
-        <select
-          className="form-input text-xs"
-          value={role}
-          onChange={e => setRole(e.target.value)}
-        >
-          <option value="member">Member</option>
-          <option value="admin">Admin</option>
-        </select>
-        <button
-          type="submit" disabled={busy || !email.trim()}
-          className="btn-primary text-xs"
-          style={{ fontVariant: 'all-small-caps' }}
-        >
-          {busy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Mail className="h-3.5 w-3.5" />}
-          {busy ? 'Sending…' : 'Send invite'}
-        </button>
-      </form>
-      <p className="text-[10px] text-amber-700/80 mt-1.5">
-        The invitee will be added to <strong>{orgName || 'this org'}</strong> directly when they accept — not your own org.
-      </p>
-    </div>
-  )
-}
 
 function RoleBadge({ role }) {
   if (role === 'admin') {
