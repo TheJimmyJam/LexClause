@@ -1,0 +1,142 @@
+{
+  "_comment": "Long-tail asbestos scenario — matter + policies only. State_rule injected per run by the multi-state runner. Three CGLs across 1985-2000 with mutually-repugnant pure-excess Other Insurance clauses, plus one umbrella covering the entire exposure period. The same matter + same policies are sent under NY, TX, and CA rules to test how priority shifts with the controlling state.",
+
+  "matter": {
+    "name": "Mason Industrial Co. — Asbestos exposure (worker, 1985-1998 employment)",
+    "description": "Plaintiff worked as a pipefitter at Mason Industrial Co.'s manufacturing facility from 1985 through 1998 and alleges continuous exposure to asbestos-containing insulation, gaskets, and pipe coverings throughout that period. Plaintiff was diagnosed with malignant mesothelioma in 2024 and brought suit alleging negligence, failure to warn, and products liability. Plaintiff seeks compensatory and punitive damages.",
+    "loss_type": "asbestos",
+    "loss_start_date": "1985-06-01",
+    "loss_end_date": "1998-12-31",
+    "venue_state": "NY",
+    "governing_state": "NY",
+    "allegations": [
+      {
+        "count": 1,
+        "theory_of_liability": "Negligence (continuous exposure)",
+        "conduct_alleged": "Defendant negligently failed to identify, control, or warn of asbestos-containing materials at its facility, resulting in continuous occupational exposure of Plaintiff from 1985 through 1998.",
+        "harm_type": "bodily_injury_long_tail"
+      },
+      {
+        "count": 2,
+        "theory_of_liability": "Failure to warn",
+        "conduct_alleged": "Defendant failed to warn workers of the known dangers of asbestos exposure despite scientific consensus by 1985 that asbestos exposure causes mesothelioma.",
+        "harm_type": "bodily_injury_long_tail"
+      },
+      {
+        "count": 3,
+        "theory_of_liability": "Strict products liability (the asbestos-containing products incorporated into the facility)",
+        "conduct_alleged": "Defendant utilized inherently dangerous asbestos-containing products throughout the relevant period without adequate safety controls.",
+        "harm_type": "bodily_injury_long_tail"
+      }
+    ],
+    "targeted_carriers": []
+  },
+
+  "policies": [
+    {
+      "id": "pol-aetna-cgl-1985",
+      "carrier": "Aetna",
+      "policy_number": "AET-CGL-1985-001",
+      "effective_date": "1985-01-01",
+      "expiration_date": "1990-01-01",
+      "state_issued": "NY",
+      "policy_form": "CGL_OCCURRENCE",
+      "per_occurrence_limit": 1000000,
+      "general_aggregate": 2000000,
+      "self_insured_retention": 0,
+      "attachment_point": 0,
+      "other_insurance_clause": "If other valid and collectible insurance applies to a loss also covered by this policy, this insurance shall be excess over such other insurance, whether such other insurance is stated to be primary, contributing, excess, contingent, or otherwise.",
+      "other_insurance_type": "EXCESS_OVER_OTHER",
+      "endorsements": [],
+      "exclusions": [
+        {
+          "label": "No asbestos exclusion (pre-1985 form)",
+          "text": "This policy does not contain an asbestos-specific exclusion. The pollution exclusion in this form is the qualified, sudden-and-accidental version applicable to environmental releases, not occupational exposure to asbestos products."
+        }
+      ],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": false
+    },
+
+    {
+      "id": "pol-travelers-cgl-1990",
+      "carrier": "Travelers",
+      "policy_number": "TRV-CGL-1990-002",
+      "effective_date": "1990-01-01",
+      "expiration_date": "1995-01-01",
+      "state_issued": "NY",
+      "policy_form": "CGL_OCCURRENCE",
+      "per_occurrence_limit": 1000000,
+      "general_aggregate": 2000000,
+      "self_insured_retention": 0,
+      "attachment_point": 0,
+      "other_insurance_clause": "This insurance is excess over any other valid and collectible insurance available to the insured, whether such other insurance is primary, excess, contingent, or on any other basis.",
+      "other_insurance_type": "EXCESS_OVER_OTHER",
+      "endorsements": [],
+      "exclusions": [
+        {
+          "label": "Pollution exclusion (qualified)",
+          "text": "This insurance does not apply to bodily injury or property damage arising out of the actual, alleged or threatened discharge, dispersal, release or escape of pollutants except where such discharge is sudden and accidental. Asbestos products incorporated into manufactured goods or building materials are not pollutants under this exclusion."
+        }
+      ],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": false
+    },
+
+    {
+      "id": "pol-hartford-cgl-1995",
+      "carrier": "Hartford",
+      "policy_number": "HTF-CGL-1995-003",
+      "effective_date": "1995-01-01",
+      "expiration_date": "2000-01-01",
+      "state_issued": "NY",
+      "policy_form": "CGL_OCCURRENCE",
+      "per_occurrence_limit": 1000000,
+      "general_aggregate": 2000000,
+      "self_insured_retention": 0,
+      "attachment_point": 0,
+      "other_insurance_clause": "If other valid and collectible insurance is available to the insured for a loss covered under this policy, our obligations are limited as follows: this insurance is excess over any of the other insurance, whether primary, excess, contingent or on any other basis.",
+      "other_insurance_type": "EXCESS_OVER_OTHER",
+      "endorsements": [],
+      "exclusions": [
+        {
+          "label": "Pollution exclusion (absolute)",
+          "text": "This insurance does not apply to bodily injury or property damage arising out of the actual, alleged or threatened discharge, dispersal, seepage, migration, release or escape of pollutants. The exclusion applies regardless of whether the discharge was sudden, accidental, or known."
+        }
+      ],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": false
+    },
+
+    {
+      "id": "pol-libertymutual-umb-1985-2000",
+      "carrier": "Liberty Mutual",
+      "policy_number": "LM-UMB-1985-2000-FF",
+      "effective_date": "1985-01-01",
+      "expiration_date": "2000-01-01",
+      "state_issued": "NY",
+      "policy_form": "UMBRELLA",
+      "per_occurrence_limit": 10000000,
+      "general_aggregate": 10000000,
+      "self_insured_retention": 0,
+      "attachment_point": 1000000,
+      "other_insurance_clause": "This insurance is excess over, and shall not contribute with, any other insurance available to the insured, whether primary, excess, contingent or on any other basis. This condition does not apply to insurance specifically purchased to be excess of this policy.",
+      "other_insurance_type": "EXCESS",
+      "endorsements": [
+        {
+          "endorsement_no": "UMB-FF",
+          "label": "Follow-Form Endorsement",
+          "text": "Coverage under this policy follows the terms, conditions, exclusions, and definitions of the underlying primary policies listed in the schedule, except as modified by the terms of this policy.",
+          "effect": "NEUTRAL"
+        }
+      ],
+      "exclusions": [],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": true
+    }
+  ]
+}
