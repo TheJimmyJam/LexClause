@@ -22,13 +22,17 @@
 /* ── Marching alternating-dash border (Analyzer dropzone) ───────────────── */
 /* SVG-based: two layered <rect> elements with rounded corners. One stroke is
    brand-blue, the other white, offset by half a dash so the colors alternate
-   continuously around the rounded perimeter. */
+   continuously around the rounded perimeter. Stroke colors live on classes
+   because SVG attribute values do NOT resolve CSS variables. */
 @keyframes lc-svg-march {
   to { stroke-dashoffset: -28; }
 }
 .lc-dash-stroke {
   animation: lc-svg-march 1.2s linear infinite;
+  fill: none;
 }
+.lc-dash-blue  { stroke: var(--brand-600); }
+.lc-dash-white { stroke: #ffffff; }
 .lc-dash-stroke.lc-dash-offset {
   animation-delay: -0.6s;  /* half-cycle phase shift = alternating colors */
 }
