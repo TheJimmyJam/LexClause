@@ -120,28 +120,52 @@ export default function Analyzer() {
 
   async function handleNewFiles(newFiles) {
     if (!profile?.org_id) { toast.error('No organization on profile.'); return }
-    for (const file of newFiles) {
-      const id = crypto.randomUUID()
-      setFiles(prev => [...prev, { id, file, status: 'uploading' }])
-      const path = `${profile.org_id}/${Date.now()}-${id.slice(0, 8)}-${file.name}`
-      try {
-        const { error: upErr } = await supabase.storage
-          .from('lc-matter-docs')
-          .upload(path, file, { contentType: 'application/pdf' })
-        if (upErr) throw upErr
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'classifying', storagePath: path } : f))
 
-        const c = await classifyDocument(path, 'lc-matter-docs')
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'ready', classification: c } : f))
+    // Add every file to the UI immediately as "queued" so the user sees them all
+    // at once even when the bucket is large. Then process with a concurrency limit
+    // so we don't hammer storage / Claude with 50 simultaneous requests.
+    const entries = Array.from(newFiles).map(file => ({
+      id:     crypto.randomUUID(),
+      file,
+      status: 'queued',
+    }))
+    setFiles(prev => [...prev, ...entries])
 
-        // Auto-detect governing state from the first trigger doc with a venue
-        if (TRIGGER_KINDS.has(c?.kind) && c?.venue_state && !governingState) {
-          setGoverningState(c.venue_state)
-        }
-      } catch (e) {
-        setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'error', error: String(e?.message || e) } : f))
-        toast.error(`${file.name}: ${e?.message || e}`)
+    const CONCURRENCY = 4
+    const queue = [...entries]
+    const worker = async () => {
+      while (queue.length) {
+        const entry = queue.shift()
+        if (!entry) return
+        await processOneFile(entry)
       }
+    }
+    await Promise.all(Array.from({ length: CONCURRENCY }, worker))
+  }
+
+  // Upload a single file to lc-matter-docs and classify it. Updates UI state
+  // at every transition so the file card shows real progress.
+  async function processOneFile(entry) {
+    const { id, file } = entry
+    const path = `${profile.org_id}/${Date.now()}-${id.slice(0, 8)}-${file.name}`
+    setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'uploading' } : f))
+    try {
+      const { error: upErr } = await supabase.storage
+        .from('lc-matter-docs')
+        .upload(path, file, { contentType: 'application/pdf' })
+      if (upErr) throw upErr
+      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'classifying', storagePath: path } : f))
+
+      const c = await classifyDocument(path, 'lc-matter-docs')
+      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'ready', classification: c } : f))
+
+      // Auto-detect governing state from the first trigger doc with a venue
+      if (TRIGGER_KINDS.has(c?.kind) && c?.venue_state && !governingState) {
+        setGoverningState(c.venue_state)
+      }
+    } catch (e) {
+      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'error', error: String(e?.message || e) } : f))
+      toast.error(`${file.name}: ${e?.message || e}`)
     }
   }
 
@@ -189,7 +213,12 @@ export default function Analyzer() {
   const policyFiles  = files.filter(f => effectiveKind(f) === 'policy' && f.status === 'ready')
   const triggerFile  = files.find(f => TRIGGER_KINDS.has(effectiveKind(f)) && f.status === 'ready')
   const otherFiles   = files.filter(f => !['policy', null, undefined].includes(effectiveKind(f)) && !TRIGGER_KINDS.has(effectiveKind(f)) && f.status === 'ready')
-  const anyClassifying = files.some(f => f.status === 'uploading' || f.status === 'classifying')
+  const queuedCount      = files.filter(f => f.status === 'queued').length
+  const uploadingCount   = files.filter(f => f.status === 'uploading').length
+  const classifyingCount = files.filter(f => f.status === 'classifying').length
+  const readyCount       = files.filter(f => f.status === 'ready').length
+  const errorCount       = files.filter(f => f.status === 'error').length
+  const anyClassifying   = queuedCount + uploadingCount + classifyingCount > 0
 
   const canAnalyze =
     phase === 'input' &&
@@ -230,39 +259,48 @@ export default function Analyzer() {
       updateStep('allegations', 'done', '')
 
       // ── 3. Copy each policy from lc-matter-docs → lc-policies, create rows ──
+      // Parallel with concurrency limit so big buckets don't take forever.
       updateStep('upload', 'active', `0 of ${policyFiles.length}`)
       const policies = []
-      for (let i = 0; i < policyFiles.length; i++) {
-        const pf = policyFiles[i]
-        updateStep('upload', 'active', `${i + 1} of ${policyFiles.length} · ${pf.file.name}`)
-        const { data: blob, error: dlErr } = await supabase.storage
-          .from('lc-matter-docs')
-          .download(pf.storagePath)
-        if (dlErr) throw dlErr
-        const newPath = `${profile.org_id}/${Date.now()}-${pf.id.slice(0, 8)}-${pf.file.name}`
-        const { error: upErr } = await supabase.storage
-          .from('lc-policies')
-          .upload(newPath, blob, { contentType: 'application/pdf' })
-        if (upErr) throw upErr
-        const { data: pol, error: polErr } = await supabase
-          .from('lc_policies')
-          .insert({
-            org_id:              profile.org_id,
-            source_filename:     pf.file.name,
-            source_storage_path: newPath,
-            policy_form:         effectiveForm(pf) || 'OTHER',
-            extraction_status:   'pending',
+      let prepared = 0
+      const POL_CONCURRENCY = 4
+      const polQueue = [...policyFiles]
+      const polWorker = async () => {
+        while (polQueue.length) {
+          const pf = polQueue.shift()
+          if (!pf) return
+          const { data: blob, error: dlErr } = await supabase.storage
+            .from('lc-matter-docs')
+            .download(pf.storagePath)
+          if (dlErr) throw dlErr
+          const newPath = `${profile.org_id}/${Date.now()}-${pf.id.slice(0, 8)}-${pf.file.name}`
+          const { error: upErr } = await supabase.storage
+            .from('lc-policies')
+            .upload(newPath, blob, { contentType: 'application/pdf' })
+          if (upErr) throw upErr
+          const { data: pol, error: polErr } = await supabase
+            .from('lc_policies')
+            .insert({
+              org_id:              profile.org_id,
+              source_filename:     pf.file.name,
+              source_storage_path: newPath,
+              policy_form:         effectiveForm(pf) || 'OTHER',
+              extraction_status:   'pending',
+            })
+            .select()
+            .single()
+          if (polErr) throw polErr
+          policies.push(pol)
+          await supabase.from('lc_matter_policies').insert({
+            matter_id: matter.id,
+            policy_id: pol.id,
+            role:      'subject',
           })
-          .select()
-          .single()
-        if (polErr) throw polErr
-        policies.push(pol)
-        await supabase.from('lc_matter_policies').insert({
-          matter_id: matter.id,
-          policy_id: pol.id,
-          role:      'subject',
-        })
+          prepared++
+          updateStep('upload', 'active', `${prepared} of ${policyFiles.length} · ${pf.file.name}`)
+        }
       }
+      await Promise.all(Array.from({ length: POL_CONCURRENCY }, polWorker))
       updateStep('upload', 'done', '')
 
       // ── 4. extract_terms in parallel + wait for completion (live count) ──
@@ -493,9 +531,45 @@ export default function Analyzer() {
       {/* Files */}
       {files.length > 0 && (
         <div className="space-y-2 mb-4">
-          <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-            Files ({files.length})
-          </h2>
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <h2 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+              Files ({files.length})
+            </h2>
+            {anyClassifying && (
+              <div className="text-[11px] text-slate-600 inline-flex items-center gap-3">
+                {queuedCount > 0 && (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="block w-1.5 h-1.5 rounded-full bg-slate-300" />
+                    {queuedCount} queued
+                  </span>
+                )}
+                {uploadingCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-brand-700">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {uploadingCount} uploading
+                  </span>
+                )}
+                {classifyingCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-brand-700">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    {classifyingCount} classifying
+                  </span>
+                )}
+                {readyCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-emerald-700">
+                    <CheckCircle2 className="h-3 w-3" />
+                    {readyCount} ready
+                  </span>
+                )}
+                {errorCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-rose-700">
+                    <XCircle className="h-3 w-3" />
+                    {errorCount} error
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
           {files.map(f => (
             <FileCard
               key={f.id}
@@ -718,6 +792,7 @@ function FileCard({ file, effectiveKind, effectiveForm, onSetKind, onSetForm, on
           <span className="text-xs text-slate-400">{Math.round(f.file.size / 1024)} KB</span>
         </div>
 
+        {f.status === 'queued'      && <Status icon="dot"  text="Queued — waiting for a slot…" />}
         {f.status === 'uploading'   && <Status icon="spin" text="Uploading…" />}
         {f.status === 'classifying' && <Status icon="spin" text="Classifying…" />}
         {f.status === 'error'       && (
@@ -784,7 +859,11 @@ function FileCard({ file, effectiveKind, effectiveForm, onSetKind, onSetForm, on
 function Status({ icon, text }) {
   return (
     <div className="flex items-center gap-1.5 text-xs text-slate-600">
-      {icon === 'spin' ? <Loader2 className="h-3 w-3 animate-spin text-brand-500" /> : <XCircle className="h-3 w-3 text-rose-500" />}
+      {icon === 'spin'
+        ? <Loader2 className="h-3 w-3 animate-spin text-brand-500" />
+        : icon === 'dot'
+          ? <span className="block w-2 h-2 rounded-full bg-slate-300" />
+          : <XCircle className="h-3 w-3 text-rose-500" />}
       <span>{text}</span>
     </div>
   )
