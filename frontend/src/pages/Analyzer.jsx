@@ -1,0 +1,800 @@
+/**
+ * Analyzer — the single-input "drop everything" page that IS the product.
+ *
+ * Flow:
+ *   1. User drags/drops any number of PDFs (policies of any kind + a complaint
+ *      / pre-suit demand / ROR / claim summary).
+ *   2. Each file uploads to lc-matter-docs and is auto-classified
+ *      (classify_document mode).
+ *   3. User can override any auto-classification before running the analysis.
+ *   4. Click "Analyze" → we create a matter, move policy files into the
+ *      lc-policies bucket, run extract_terms on each policy + extract_allegations
+ *      on the trigger document, then run coverage_priority.
+ *   5. The resulting Trigger / Priority / Exhaustion opinion renders inline
+ *      with download buttons. No "dashboard," no library to manage.
+ */
+
+import { useState, useEffect, useRef } from 'react'
+import { useDropzone } from 'react-dropzone'
+import {
+  Upload, FileText, Loader2, CheckCircle2, AlertTriangle, X, XCircle,
+  Sparkles, ScrollText, Scale, Shield, ChevronDown, Plus, Search,
+} from 'lucide-react'
+import toast from 'react-hot-toast'
+import { supabase } from '../lib/supabase.js'
+import { useAuth } from '../hooks/useAuth.jsx'
+import {
+  classifyDocument,
+  extractAllegations,
+  extractPolicyTerms,
+  runCoveragePriority,
+  runCoveragePriorityComparison,
+} from '../lib/policyAnalysis.js'
+
+const ALL_STATES = [
+  'AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME',
+  'MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI',
+  'SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY',
+]
+
+const KIND_LABELS = {
+  policy:           'Policy',
+  complaint:        'Complaint',
+  petition:         'Petition',
+  demand_letter:    'Pre-suit demand',
+  ror_letter:       'Reservation of rights',
+  claim_summary:    'Claim summary',
+  fnol:             'FNOL',
+  other:            'Other',
+}
+const KIND_COLORS = {
+  policy:        'bg-emerald-100 text-emerald-800 border-emerald-200',
+  complaint:     'bg-purple-100 text-purple-800 border-purple-200',
+  petition:      'bg-purple-100 text-purple-800 border-purple-200',
+  demand_letter: 'bg-amber-100 text-amber-800 border-amber-200',
+  ror_letter:    'bg-rose-100 text-rose-800 border-rose-200',
+  claim_summary: 'bg-sky-100 text-sky-800 border-sky-200',
+  fnol:          'bg-sky-100 text-sky-800 border-sky-200',
+  other:         'bg-slate-100 text-slate-700 border-slate-200',
+}
+const POLICY_FORM_LABELS = {
+  CGL_OCCURRENCE:      'CGL (Occurrence)',
+  CGL_CLAIMS_MADE:     'CGL (Claims-Made)',
+  UMBRELLA:            'Umbrella',
+  EXCESS:              'Excess',
+  PROFESSIONAL:        'Professional / E&O',
+  POLLUTION_CONTRACTOR:"Contractor's Pollution",
+  POLLUTION_SITE:      'Site Pollution',
+  BUILDERS_RISK:       "Builder's Risk",
+  'D&O':               'D&O',
+  PROPERTY:            'Property',
+  OTHER:               'Other',
+}
+const TRIGGER_KINDS = new Set(['complaint','petition','demand_letter','ror_letter','claim_summary','fnol'])
+
+export default function Analyzer() {
+  const { profile } = useAuth()
+
+  // Files: each entry is { id, file, status, storagePath, classification, error, kindOverride, formOverride }
+  const [files, setFiles]                       = useState([])
+  const [governingState, setGoverningState]     = useState('')
+  const [comparisonStates, setComparisonStates] = useState([])
+  const [phase, setPhase]                       = useState('input')   // input | running | done | failed
+  const [matterId, setMatterId]                 = useState(null)
+  const [analysisId, setAnalysisId]             = useState(null)
+  const [comparisonGroupId, setComparisonGroupId] = useState(null)
+  const [analysis, setAnalysis]                 = useState(null)      // single-state coverage_priority result
+  const [comparison, setComparison]             = useState([])        // multi-state results
+
+  // ── Dropzone ─────────────────────────────────────────────────────────────
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({
+    accept: { 'application/pdf': ['.pdf'] },
+    multiple: true,
+    disabled: phase !== 'input',
+    onDrop: (newFiles) => handleNewFiles(newFiles),
+  })
+
+  async function handleNewFiles(newFiles) {
+    if (!profile?.org_id) { toast.error('No organization on profile.'); return }
+    for (const file of newFiles) {
+      const id = crypto.randomUUID()
+      setFiles(prev => [...prev, { id, file, status: 'uploading' }])
+      const path = `${profile.org_id}/${Date.now()}-${id.slice(0, 8)}-${file.name}`
+      try {
+        const { error: upErr } = await supabase.storage
+          .from('lc-matter-docs')
+          .upload(path, file, { contentType: 'application/pdf' })
+        if (upErr) throw upErr
+        setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'classifying', storagePath: path } : f))
+
+        const c = await classifyDocument(path, 'lc-matter-docs')
+        setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'ready', classification: c } : f))
+
+        // Auto-detect governing state from the first trigger doc with a venue
+        if (TRIGGER_KINDS.has(c?.kind) && c?.venue_state && !governingState) {
+          setGoverningState(c.venue_state)
+        }
+      } catch (e) {
+        setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'error', error: String(e?.message || e) } : f))
+        toast.error(`${file.name}: ${e?.message || e}`)
+      }
+    }
+  }
+
+  function setOverrideKind(id, kind) {
+    setFiles(prev => prev.map(f =>
+      f.id === id ? { ...f, kindOverride: kind, formOverride: kind === 'policy' ? (f.formOverride || f.classification?.policy_form || 'OTHER') : null } : f))
+  }
+  function setOverrideForm(id, form) {
+    setFiles(prev => prev.map(f => f.id === id ? { ...f, formOverride: form } : f))
+  }
+  function removeFile(id) {
+    setFiles(prev => prev.filter(f => f.id !== id))
+  }
+
+  // Effective classification: override wins over auto
+  function effectiveKind(f) { return f.kindOverride ?? f.classification?.kind ?? null }
+  function effectiveForm(f) { return f.formOverride ?? f.classification?.policy_form ?? null }
+
+  const policyFiles  = files.filter(f => effectiveKind(f) === 'policy' && f.status === 'ready')
+  const triggerFile  = files.find(f => TRIGGER_KINDS.has(effectiveKind(f)) && f.status === 'ready')
+  const otherFiles   = files.filter(f => !['policy', null, undefined].includes(effectiveKind(f)) && !TRIGGER_KINDS.has(effectiveKind(f)) && f.status === 'ready')
+  const anyClassifying = files.some(f => f.status === 'uploading' || f.status === 'classifying')
+
+  const canAnalyze =
+    phase === 'input' &&
+    !anyClassifying &&
+    policyFiles.length >= 1 &&
+    !!triggerFile &&
+    !!governingState
+
+  // ── Analyze ──────────────────────────────────────────────────────────────
+  async function analyze() {
+    if (!canAnalyze) return
+    setPhase('running')
+    try {
+      // 1. Create the matter (we'll fill in fields after extract_allegations runs)
+      const { data: matter, error: matterErr } = await supabase
+        .from('lc_matters')
+        .insert({
+          org_id:                   profile.org_id,
+          name:                     'Untitled — ' + new Date().toLocaleDateString(),
+          governing_state:          governingState,
+          venue_state:              governingState,
+          source_document_path:     triggerFile.storagePath,
+          source_document_filename: triggerFile.file.name,
+          source_document_type:     effectiveKind(triggerFile),
+        })
+        .select()
+        .single()
+      if (matterErr) throw matterErr
+      setMatterId(matter.id)
+
+      // 2. Extract allegations from the trigger doc — writes back to lc_matters
+      await extractAllegations(triggerFile.storagePath, matter.id)
+
+      // 3. For each policy file: copy from lc-matter-docs to lc-policies,
+      //    create lc_policies row, run extract_terms in parallel.
+      const policies = []
+      for (const pf of policyFiles) {
+        const { data: blob, error: dlErr } = await supabase.storage
+          .from('lc-matter-docs')
+          .download(pf.storagePath)
+        if (dlErr) throw dlErr
+        const newPath = `${profile.org_id}/${Date.now()}-${pf.id.slice(0, 8)}-${pf.file.name}`
+        const { error: upErr } = await supabase.storage
+          .from('lc-policies')
+          .upload(newPath, blob, { contentType: 'application/pdf' })
+        if (upErr) throw upErr
+        const { data: pol, error: polErr } = await supabase
+          .from('lc_policies')
+          .insert({
+            org_id:              profile.org_id,
+            source_filename:     pf.file.name,
+            source_storage_path: newPath,
+            policy_form:         effectiveForm(pf) || 'OTHER',
+            extraction_status:   'pending',
+          })
+          .select()
+          .single()
+        if (polErr) throw polErr
+        policies.push(pol)
+        await supabase.from('lc_matter_policies').insert({
+          matter_id: matter.id,
+          policy_id: pol.id,
+          role:      'subject',
+        })
+      }
+
+      // 4. Run extract_terms in parallel; wait for all to finish before priority analysis
+      await Promise.all(policies.map(p => extractPolicyTerms(p.id).catch(e => {
+        console.error('extract_terms failed', p.id, e)
+      })))
+
+      // Wait for extraction_status to flip to 'complete' on each policy (poll briefly)
+      await waitForPolicyExtractions(policies.map(p => p.id), 60_000)
+
+      // 5. Run coverage_priority (single-state or multi-state comparison)
+      if (comparisonStates.length >= 2) {
+        const result = await runCoveragePriorityComparison(matter.id, comparisonStates)
+        setComparisonGroupId(result.comparisonGroupId)
+        await pollComparison(result.comparisonGroupId)
+      } else {
+        const result = await runCoveragePriority(matter.id, { governingState })
+        setAnalysisId(result.analysisId)
+        await pollAnalysis(result.analysisId)
+      }
+
+      setPhase('done')
+    } catch (e) {
+      console.error('Analyze failed', e)
+      toast.error(`Analysis failed: ${e?.message || e}`)
+      setPhase('failed')
+    }
+  }
+
+  async function waitForPolicyExtractions(policyIds, timeoutMs = 60_000) {
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      const { data } = await supabase
+        .from('lc_policies')
+        .select('id, extraction_status')
+        .in('id', policyIds)
+      const allDone = (data || []).every(p => p.extraction_status === 'complete' || p.extraction_status === 'failed')
+      if (allDone) return
+      await new Promise(r => setTimeout(r, 1500))
+    }
+  }
+
+  async function pollAnalysis(id) {
+    const start = Date.now()
+    while (Date.now() - start < 5 * 60_000) {
+      const { data } = await supabase
+        .from('lc_analyses')
+        .select('*, lc_analysis_results(*), lc_matters(name)')
+        .eq('id', id)
+        .single()
+      if (data?.status === 'complete' || data?.status === 'failed') {
+        setAnalysis(data)
+        return
+      }
+      await new Promise(r => setTimeout(r, 2000))
+    }
+    throw new Error('Analysis timed out after 5 minutes')
+  }
+
+  async function pollComparison(groupId) {
+    const start = Date.now()
+    while (Date.now() - start < 5 * 60_000) {
+      const { data } = await supabase
+        .from('lc_analyses')
+        .select('*, lc_analysis_results(*)')
+        .eq('comparison_group_id', groupId)
+        .order('created_at', { ascending: true })
+      const allDone = (data || []).length > 0 && data.every(a => a.status === 'complete' || a.status === 'failed')
+      if (allDone) {
+        setComparison(data)
+        return
+      }
+      await new Promise(r => setTimeout(r, 2000))
+    }
+    throw new Error('Comparison timed out after 5 minutes')
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  if (phase === 'done') {
+    return (
+      <ResultView
+        analysis={analysis}
+        comparison={comparison}
+        comparisonGroupId={comparisonGroupId}
+        onReset={() => location.reload()}
+      />
+    )
+  }
+
+  return (
+    <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+      <header className="mb-8">
+        <h1 className="text-4xl font-bold text-slate-900 tracking-tight">Coverage priority analysis</h1>
+        <p className="text-slate-600 mt-2 text-lg">
+          Drop your policies and the lawsuit. Get a citable Trigger / Priority / Exhaustion opinion under the controlling state's law.
+        </p>
+      </header>
+
+      {/* Drop zone */}
+      <div
+        {...getRootProps()}
+        className={`card p-10 text-center cursor-pointer border-2 border-dashed transition-colors mb-6 ${
+          phase !== 'input' ? 'opacity-50 cursor-not-allowed' :
+          isDragActive ? 'border-brand-500 bg-brand-50/50' : 'border-slate-300 hover:border-brand-400 hover:bg-slate-50'
+        }`}
+      >
+        <input {...getInputProps()} />
+        <Upload className="h-10 w-10 text-slate-400 mx-auto mb-3" />
+        <p className="text-slate-700 font-medium">
+          {isDragActive ? 'Drop the files here…' : 'Drop policies + lawsuit here, or click to browse'}
+        </p>
+        <p className="text-slate-500 text-sm mt-1">
+          CGL · pollution · professional · builder's risk · umbrella · excess · complaint · pre-suit demand · ROR
+        </p>
+      </div>
+
+      {/* Files */}
+      {files.length > 0 && (
+        <div className="space-y-3 mb-8">
+          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
+            Files ({files.length})
+          </h2>
+          {files.map(f => (
+            <FileCard
+              key={f.id}
+              file={f}
+              effectiveKind={effectiveKind(f)}
+              effectiveForm={effectiveForm(f)}
+              onSetKind={(k) => setOverrideKind(f.id, k)}
+              onSetForm={(form) => setOverrideForm(f.id, form)}
+              onRemove={() => removeFile(f.id)}
+              disabled={phase !== 'input'}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Controls panel — appears once at least one of each */}
+      {policyFiles.length >= 1 && triggerFile && (
+        <div className="card p-6 mb-6 bg-gradient-to-br from-brand-50/40 to-cyan-50/30 border-brand-200/60">
+          <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Sparkles className="h-4 w-4 text-brand-600" />
+            Ready to analyze
+          </h2>
+
+          <div className="grid sm:grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Governing state
+              </label>
+              <select
+                value={governingState}
+                onChange={(e) => setGoverningState(e.target.value)}
+                disabled={phase !== 'input'}
+                className="form-select w-full"
+              >
+                <option value="">— Select state —</option>
+                {ALL_STATES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              {triggerFile?.classification?.venue_state && triggerFile.classification.venue_state !== governingState && (
+                <p className="text-xs text-slate-500 mt-1">Venue detected in {triggerFile.classification.venue_state}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
+                Compare under additional states (optional)
+              </label>
+              <MultiStateSelector
+                states={comparisonStates}
+                onChange={setComparisonStates}
+                exclude={governingState}
+                disabled={phase !== 'input'}
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between border-t border-brand-200/60 pt-4">
+            <div className="text-xs text-slate-600">
+              <strong>{policyFiles.length}</strong> polic{policyFiles.length === 1 ? 'y' : 'ies'} ·{' '}
+              <strong>1</strong> trigger doc{otherFiles.length > 0 ? ` · ${otherFiles.length} other` : ''}
+              {comparisonStates.length > 0 && ` · compare ${comparisonStates.length + 1} states`}
+            </div>
+            <button
+              onClick={analyze}
+              disabled={!canAnalyze}
+              className="btn-primary"
+            >
+              {phase === 'running' ? <><Loader2 className="h-4 w-4 animate-spin" /> Analyzing…</> : <><Scale className="h-4 w-4" /> Run analysis</>}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {phase === 'running' && <RunningOverlay />}
+
+      {phase === 'failed' && (
+        <div className="card p-6 border-red-200 bg-red-50/40 text-red-900">
+          <div className="flex items-start gap-3">
+            <XCircle className="h-5 w-5 mt-0.5 flex-shrink-0 text-red-600" />
+            <div>
+              <p className="font-semibold">Analysis failed.</p>
+              <p className="text-sm mt-1">Check the toast for details, then click "Reset" to try again.</p>
+              <button onClick={() => location.reload()} className="text-sm underline mt-2">Reset</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// File card — one row per uploaded file
+// ──────────────────────────────────────────────────────────────────────────
+function FileCard({ file, effectiveKind, effectiveForm, onSetKind, onSetForm, onRemove, disabled }) {
+  const f = file
+  const c = f.classification
+  const isTrigger = TRIGGER_KINDS.has(effectiveKind)
+
+  return (
+    <div className="card p-4 flex items-start gap-4">
+      <FileText className="h-5 w-5 text-slate-400 mt-0.5 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <span className="font-medium text-slate-900 truncate">{f.file.name}</span>
+          <span className="text-xs text-slate-400">{Math.round(f.file.size / 1024)} KB</span>
+        </div>
+
+        {f.status === 'uploading'   && <Status icon="spin" text="Uploading…" />}
+        {f.status === 'classifying' && <Status icon="spin" text="Classifying…" />}
+        {f.status === 'error'       && <Status icon="x" text={f.error} />}
+
+        {f.status === 'ready' && (
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            {/* Kind badge / dropdown */}
+            <KindDropdown
+              value={effectiveKind}
+              onChange={onSetKind}
+              disabled={disabled}
+            />
+            {effectiveKind === 'policy' && (
+              <PolicyFormDropdown
+                value={effectiveForm}
+                onChange={onSetForm}
+                disabled={disabled}
+              />
+            )}
+            {c?.confidence && c.confidence !== 'high' && !f.kindOverride && (
+              <span className="text-xs text-amber-700 inline-flex items-center gap-1">
+                <AlertTriangle className="h-3 w-3" /> {c.confidence} confidence — verify
+              </span>
+            )}
+            {c?.summary && (
+              <p className="text-xs text-slate-500 w-full mt-1.5 leading-relaxed">{c.summary}</p>
+            )}
+            {isTrigger && c?.venue_state && (
+              <span className="text-xs text-slate-500">Venue: {c.venue_state}</span>
+            )}
+            {c?.carrier_or_caption && (
+              <span className="text-xs text-slate-500 w-full italic">{c.carrier_or_caption}</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={onRemove}
+        disabled={disabled}
+        className="text-slate-400 hover:text-rose-600 disabled:opacity-30"
+        title="Remove"
+      >
+        <X className="h-4 w-4" />
+      </button>
+    </div>
+  )
+}
+
+function Status({ icon, text }) {
+  return (
+    <div className="flex items-center gap-1.5 text-xs text-slate-600">
+      {icon === 'spin' ? <Loader2 className="h-3 w-3 animate-spin text-brand-500" /> : <XCircle className="h-3 w-3 text-rose-500" />}
+      <span>{text}</span>
+    </div>
+  )
+}
+
+function KindDropdown({ value, onChange, disabled }) {
+  const colorCls = KIND_COLORS[value] || KIND_COLORS.other
+  return (
+    <select
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+      disabled={disabled}
+      className={`text-xs font-medium px-2 py-0.5 rounded-full border ${colorCls} focus:ring-2 focus:ring-brand-300 focus:outline-none disabled:opacity-50`}
+    >
+      {Object.entries(KIND_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+    </select>
+  )
+}
+
+function PolicyFormDropdown({ value, onChange, disabled }) {
+  return (
+    <select
+      value={value || 'OTHER'}
+      onChange={e => onChange(e.target.value)}
+      disabled={disabled}
+      className="text-xs font-medium px-2 py-0.5 rounded-full border border-slate-200 bg-white text-slate-700 focus:ring-2 focus:ring-brand-300 focus:outline-none disabled:opacity-50"
+    >
+      {Object.entries(POLICY_FORM_LABELS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+    </select>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Multi-state comparison selector
+// ──────────────────────────────────────────────────────────────────────────
+function MultiStateSelector({ states, onChange, exclude, disabled }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  useEffect(() => {
+    function onDoc(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
+
+  const toggle = (s) => {
+    if (states.includes(s)) onChange(states.filter(x => x !== s))
+    else onChange([...states, s])
+  }
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen(o => !o)}
+        className="form-select w-full text-left flex items-center justify-between disabled:opacity-50"
+      >
+        <span className={states.length === 0 ? 'text-slate-400' : 'text-slate-900'}>
+          {states.length === 0 ? 'None' : states.join(', ')}
+        </span>
+        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+      </button>
+      {open && (
+        <div className="absolute z-20 mt-1 w-64 max-h-72 overflow-auto bg-white border border-slate-200 rounded-lg shadow-modal p-2">
+          <div className="grid grid-cols-4 gap-1">
+            {ALL_STATES.filter(s => s !== exclude).map(s => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => toggle(s)}
+                className={`px-2 py-1 text-xs font-medium rounded ${
+                  states.includes(s)
+                    ? 'bg-brand-600 text-white'
+                    : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Running overlay — inline progress while we extract + run priority
+// ──────────────────────────────────────────────────────────────────────────
+function RunningOverlay() {
+  return (
+    <div className="card p-8 border-brand-200/60 bg-gradient-to-br from-brand-50/50 to-cyan-50/30">
+      <div className="flex items-start gap-4">
+        <Loader2 className="h-6 w-6 text-brand-600 animate-spin flex-shrink-0 mt-1" />
+        <div>
+          <h2 className="font-semibold text-slate-900 mb-1">Running coverage-priority analysis…</h2>
+          <p className="text-sm text-slate-600">
+            Extracting allegations, parsing policy terms, and running the trigger / priority / exhaustion analysis. Usually takes 30-90 seconds.
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// Result view — Trigger / Priority / Exhaustion + narrative + downloads
+// ──────────────────────────────────────────────────────────────────────────
+function ResultView({ analysis, comparison, comparisonGroupId, onReset }) {
+  if (comparisonGroupId && comparison?.length) {
+    return <ComparisonResult comparison={comparison} onReset={onReset} />
+  }
+  if (!analysis) return <div className="p-10 text-center text-slate-500">Loading…</div>
+  return <SingleStateResult analysis={analysis} onReset={onReset} />
+}
+
+function SingleStateResult({ analysis, onReset }) {
+  const results = (analysis.lc_analysis_results || []).slice().sort((a, b) => (a.ordering ?? 0) - (b.ordering ?? 0))
+  const triggered = results.filter(r => r.triggered === 'yes' || r.triggered === 'partial')
+  const notTriggered = results.filter(r => r.triggered === 'no')
+
+  return (
+    <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+      <header className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Coverage priority opinion</h1>
+          <p className="text-slate-600 mt-1">Governing law: <strong>{analysis.governing_state}</strong></p>
+        </div>
+        <button onClick={onReset} className="btn-secondary"><Plus className="h-4 w-4" /> New analysis</button>
+      </header>
+
+      {analysis.validation_status === 'needs_review' && (
+        <div className="card p-4 mb-6 border-amber-200 bg-amber-50/60">
+          <div className="flex items-start gap-2 text-sm text-amber-900">
+            <AlertTriangle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <span>The engine flagged this opinion for human review (couldn't reconcile all invariants after {analysis.validation_attempts} attempts). Treat as a draft.</span>
+          </div>
+        </div>
+      )}
+
+      {/* Trigger */}
+      <Section icon={<ScrollText className="h-5 w-5" />} title="Trigger / Duty to Defend">
+        <div className="space-y-3">
+          {results.map(r => <TriggerCard key={r.id} r={r} />)}
+        </div>
+      </Section>
+
+      {/* Priority */}
+      <Section icon={<Scale className="h-5 w-5" />} title="Priority of Coverage">
+        {triggered.length === 0 ? (
+          <p className="text-sm text-slate-500 italic">No triggered policies.</p>
+        ) : (
+          <div className="space-y-3">
+            {triggered.map(r => <PriorityCard key={r.id} r={r} />)}
+          </div>
+        )}
+        {analysis.priority_rule_applied && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <p className="text-sm text-slate-700 leading-relaxed">{analysis.priority_rule_applied}</p>
+            {analysis.priority_rule_citation && (
+              <p className="text-xs text-slate-500 mt-2 italic">{analysis.priority_rule_citation}</p>
+            )}
+          </div>
+        )}
+        {Array.isArray(analysis.mutually_repugnant_groups) && analysis.mutually_repugnant_groups.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <h4 className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-2">Mutually-repugnant groups</h4>
+            {analysis.mutually_repugnant_groups.map((g, i) => (
+              <div key={i} className="text-sm text-slate-700 mb-2">
+                <p>{g.reason}</p>
+                <p className="text-slate-500 italic mt-1">→ default rule: {g.default_rule}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      {/* Exhaustion */}
+      <Section icon={<Shield className="h-5 w-5" />} title="Exhaustion">
+        <div className="text-sm text-slate-700 leading-relaxed">
+          <p className="mb-2">
+            <span className="badge bg-brand-100 text-brand-800 mr-2">{(analysis.exhaustion_rule || 'undetermined').toUpperCase()}</span>
+          </p>
+          {analysis.lc_analyses?.exhaustion_rationale || analysis.raw_engine_output?.exhaustion_analysis?.rationale ? (
+            <p>{analysis.raw_engine_output?.exhaustion_analysis?.rationale}</p>
+          ) : null}
+          {analysis.exhaustion_rule_citation && (
+            <p className="text-xs text-slate-500 mt-2 italic">{analysis.exhaustion_rule_citation}</p>
+          )}
+        </div>
+      </Section>
+
+      {/* Narrative */}
+      {analysis.narrative && (
+        <Section icon={<Sparkles className="h-5 w-5" />} title="Opinion summary">
+          <div className="prose prose-slate prose-sm max-w-none whitespace-pre-wrap leading-relaxed text-slate-700">
+            {analysis.narrative}
+          </div>
+        </Section>
+      )}
+    </div>
+  )
+}
+
+function ComparisonResult({ comparison, onReset }) {
+  return (
+    <div className="p-6 lg:p-10 max-w-6xl mx-auto">
+      <header className="flex items-start justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold text-slate-900">Multi-state coverage priority comparison</h1>
+          <p className="text-slate-600 mt-1">Same matter, {comparison.length} jurisdictions side-by-side.</p>
+        </div>
+        <button onClick={onReset} className="btn-secondary"><Plus className="h-4 w-4" /> New analysis</button>
+      </header>
+
+      <div className="grid lg:grid-cols-3 gap-4">
+        {comparison.map(a => (
+          <div key={a.id} className="card p-5">
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-1">Governing law</div>
+            <h2 className="text-2xl font-bold text-slate-900 mb-3">{a.governing_state}</h2>
+
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-4 mb-2">Triggered</div>
+            <ul className="text-sm text-slate-700 space-y-1">
+              {(a.lc_analysis_results || []).filter(r => r.triggered === 'yes' || r.triggered === 'partial').map(r => (
+                <li key={r.id} className="flex items-start gap-1.5">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <span>{r.carrier} <span className="text-slate-400">— {r.priority_rank || '—'}</span></span>
+                </li>
+              ))}
+              {(a.lc_analysis_results || []).filter(r => r.triggered === 'no').map(r => (
+                <li key={r.id} className="flex items-start gap-1.5 text-slate-400">
+                  <X className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                  <span className="line-through">{r.carrier}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="text-xs uppercase tracking-wider text-slate-500 font-semibold mt-4 mb-1">Exhaustion</div>
+            <p className="text-sm text-slate-700">{a.exhaustion_rule || '—'}</p>
+
+            {a.priority_rule_citation && (
+              <p className="text-xs text-slate-500 italic mt-3 leading-snug">{a.priority_rule_citation}</p>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Section({ icon, title, children }) {
+  return (
+    <section className="card p-6 mb-5">
+      <h2 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <span className="text-brand-600">{icon}</span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function TriggerCard({ r }) {
+  const triggered = r.triggered
+  const palette =
+    triggered === 'yes'     ? 'bg-emerald-50/60 border-emerald-200' :
+    triggered === 'partial' ? 'bg-amber-50/60   border-amber-200'   :
+                              'bg-slate-50/60   border-slate-200'
+  const badge =
+    triggered === 'yes'     ? 'bg-emerald-100 text-emerald-800' :
+    triggered === 'partial' ? 'bg-amber-100   text-amber-800'   :
+                              'bg-slate-200   text-slate-600'
+  return (
+    <div className={`p-4 rounded-lg border ${palette}`}>
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <div className="font-medium text-slate-900">
+          {r.carrier} <span className="text-slate-400 font-normal">· {r.policy_number}</span>
+        </div>
+        <span className={`badge ${badge} uppercase`}>{triggered || '—'}</span>
+      </div>
+      {r.coverage_grant_basis && (
+        <p className="text-xs text-slate-600 italic mb-1">{r.coverage_grant_basis}</p>
+      )}
+      {r.trigger_rationale && (
+        <p className="text-sm text-slate-700 leading-relaxed">{r.trigger_rationale}</p>
+      )}
+    </div>
+  )
+}
+
+function PriorityCard({ r }) {
+  const ranks = {
+    'primary':     'bg-emerald-100 text-emerald-800',
+    'co-primary':  'bg-teal-100 text-teal-800',
+    'excess':      'bg-purple-100 text-purple-800',
+    'sub-excess':  'bg-violet-100 text-violet-800',
+  }
+  return (
+    <div className="p-4 rounded-lg border border-slate-200 bg-white">
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <div className="font-medium text-slate-900">
+          {r.carrier} <span className="text-slate-400 font-normal">· {r.policy_number}</span>
+        </div>
+        <span className={`badge ${ranks[r.priority_rank] || 'bg-slate-100 text-slate-700'} uppercase`}>{r.priority_rank || '—'}</span>
+      </div>
+      {r.priority_rank_basis && <p className="text-sm text-slate-700 leading-relaxed mb-1">{r.priority_rank_basis}</p>}
+      {r.other_insurance_quote && (
+        <p className="text-xs text-slate-500 italic mt-2 border-l-2 border-slate-200 pl-2">"{r.other_insurance_quote}"</p>
+      )}
+    </div>
+  )
+}
