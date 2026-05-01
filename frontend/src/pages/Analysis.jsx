@@ -51,7 +51,7 @@ export default function Analysis() {
 
       <div className="flex items-start justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900">Coverage Allocation</h1>
+          <h1 className="text-3xl font-bold text-slate-900">Coverage Analysis</h1>
           <p className="text-slate-600 mt-1">{analysis.lc_matters?.name}</p>
         </div>
         {analysis.status === 'complete' && (
@@ -97,10 +97,10 @@ export default function Analysis() {
 
       <div className="card overflow-hidden mb-8">
         <div className="px-5 py-4 border-b border-slate-100">
-          <h2 className="font-semibold text-slate-900">Per-Carrier Allocation</h2>
+          <h2 className="font-semibold text-slate-900">Per-Carrier Result</h2>
         </div>
         {results.length === 0 ? (
-          <div className="p-10 text-center text-slate-500 text-sm">No allocation rows yet.</div>
+          <div className="p-10 text-center text-slate-500 text-sm">No analysis rows yet.</div>
         ) : (
           <table className="w-full text-sm">
             <thead className="bg-slate-50 border-b border-slate-100 text-left text-xs uppercase tracking-wider text-slate-500">
@@ -193,7 +193,7 @@ function RunningCard({ attempts }) {
       <div className="flex items-start gap-4">
         <Loader2 className="h-6 w-6 text-brand-600 animate-spin flex-shrink-0 mt-1" />
         <div className="flex-1">
-          <h2 className="font-semibold text-slate-900 mb-1">Running coverage allocation…</h2>
+          <h2 className="font-semibold text-slate-900 mb-1">Running coverage analysis…</h2>
           <p className="text-sm text-slate-600">
             Claude is reading the policies, applying the controlling state's rule, and validating the math.
             This usually takes 20-60 seconds; if validation fails, the engine retries up to three times.
@@ -237,7 +237,7 @@ function FailedCard({ error }) {
         <div>
           <h2 className="font-semibold text-red-900 mb-1">Analysis failed</h2>
           <p className="text-sm text-red-800">
-            The engine couldn't produce a valid allocation. You can re-run from the matter page.
+            The engine couldn't produce a valid analysis. You can re-run from the matter page.
           </p>
           {error && (
             <pre className="text-xs text-red-700 mt-3 whitespace-pre-wrap font-mono bg-red-100/50 p-2 rounded">
