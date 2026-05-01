@@ -1,0 +1,163 @@
+{
+  "_comment": "Hand-crafted test scenario for the COVERAGE_PRIORITY_SYSTEM prompt. A construction-site pollution claim under Texas law with four policies: two CGLs (one with a silent Other Insurance clause, one with a pure-excess Other Insurance clause), one contractor's pollution policy, and one umbrella. State rule citations are real Texas Supreme Court authority. The expected analysis: (1) both CGLs are triggered for the bodily-injury count, the pollution policy is triggered for the contamination count, the umbrella is triggered as follows-form excess; (2) the silent CGL is primary, the pure-excess CGL is excess to it, the pollution policy is primary as to the pollution-specific allegations, the umbrella sits above all primary; (3) Texas follows vertical exhaustion.",
+
+  "matter": {
+    "name": "Greenfield Builders LLC — TX construction-site diesel spill + bodily injury",
+    "description": "Plaintiff, a neighboring landowner, alleges that during construction of a commercial warehouse Defendant Greenfield Builders LLC negligently spilled approximately 200 gallons of diesel fuel from a generator, contaminating Plaintiff's adjoining property. Plaintiff's tenant inhaled fumes during the cleanup and alleges respiratory bodily injury. Plaintiff seeks compensatory damages and punitive damages.",
+    "loss_type": "construction_defect",
+    "loss_start_date": "2024-08-15",
+    "loss_end_date": "2024-08-15",
+    "venue_state": "TX",
+    "governing_state": "TX",
+    "allegations": [
+      {
+        "count": 1,
+        "theory_of_liability": "Negligence",
+        "conduct_alleged": "Defendant negligently maintained and operated a diesel generator on the construction site, allowing a 200-gallon spill that contaminated Plaintiff's adjoining property.",
+        "harm_type": "property_damage_pollution"
+      },
+      {
+        "count": 2,
+        "theory_of_liability": "Negligence (bodily injury)",
+        "conduct_alleged": "Plaintiff's tenant was present during cleanup and inhaled diesel fumes, suffering respiratory injury.",
+        "harm_type": "bodily_injury"
+      },
+      {
+        "count": 3,
+        "theory_of_liability": "Gross negligence (punitive)",
+        "conduct_alleged": "Defendant's failure to maintain the generator and respond timely was alleged to be grossly negligent, supporting punitive damages.",
+        "harm_type": "punitive"
+      }
+    ]
+  },
+
+  "policies": [
+    {
+      "id": "pol-cgl-libertymutual-001",
+      "carrier": "Liberty Mutual",
+      "policy_number": "LM-CGL-2024-7788",
+      "effective_date": "2024-01-01",
+      "expiration_date": "2025-01-01",
+      "state_issued": "TX",
+      "policy_form": "CGL_OCCURRENCE",
+      "per_occurrence_limit": 1000000,
+      "general_aggregate": 2000000,
+      "self_insured_retention": 0,
+      "attachment_point": 0,
+      "other_insurance_clause": null,
+      "other_insurance_type": "SILENT",
+      "endorsements": [],
+      "exclusions": [
+        {
+          "label": "Pollution Exclusion (CG 21 49)",
+          "text": "This insurance does not apply to bodily injury or property damage which would not have occurred in whole or part but for the actual, alleged or threatened discharge, dispersal, seepage, migration, release or escape of pollutants at any time. Pollutants means any solid, liquid, gaseous or thermal irritant or contaminant, including smoke, vapor, soot, fumes, acids, alkalis, chemicals and waste."
+        }
+      ],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": false
+    },
+
+    {
+      "id": "pol-cgl-travelers-002",
+      "carrier": "Travelers",
+      "policy_number": "TRV-CGL-2024-4421",
+      "effective_date": "2024-03-01",
+      "expiration_date": "2025-03-01",
+      "state_issued": "TX",
+      "policy_form": "CGL_OCCURRENCE",
+      "per_occurrence_limit": 1000000,
+      "general_aggregate": 2000000,
+      "self_insured_retention": 0,
+      "attachment_point": 0,
+      "other_insurance_clause": "This insurance is excess over any other valid and collectible insurance available to the insured, whether such other insurance is primary, excess, contingent, or on any other basis.",
+      "other_insurance_type": "EXCESS_OVER_OTHER",
+      "endorsements": [],
+      "exclusions": [
+        {
+          "label": "Pollution Exclusion (CG 21 49)",
+          "text": "This insurance does not apply to bodily injury or property damage which would not have occurred in whole or part but for the actual, alleged or threatened discharge, dispersal, seepage, migration, release or escape of pollutants at any time."
+        }
+      ],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": false
+    },
+
+    {
+      "id": "pol-cpl-zurich-003",
+      "carrier": "Zurich",
+      "policy_number": "ZUR-CPL-2024-9933",
+      "effective_date": "2024-01-01",
+      "expiration_date": "2025-01-01",
+      "state_issued": "TX",
+      "policy_form": "POLLUTION_CONTRACTOR",
+      "per_occurrence_limit": 2000000,
+      "general_aggregate": 4000000,
+      "self_insured_retention": 25000,
+      "attachment_point": 0,
+      "other_insurance_clause": null,
+      "other_insurance_type": "SILENT",
+      "endorsements": [],
+      "exclusions": [
+        {
+          "label": "Known conditions exclusion",
+          "text": "This insurance does not apply to pollution conditions known to the insured prior to the inception of the policy period."
+        }
+      ],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": false
+    },
+
+    {
+      "id": "pol-umb-travelers-004",
+      "carrier": "Travelers",
+      "policy_number": "TRV-UMB-2024-5562",
+      "effective_date": "2024-03-01",
+      "expiration_date": "2025-03-01",
+      "state_issued": "TX",
+      "policy_form": "UMBRELLA",
+      "per_occurrence_limit": 5000000,
+      "general_aggregate": 5000000,
+      "self_insured_retention": 0,
+      "attachment_point": 1000000,
+      "other_insurance_clause": "This insurance is excess over, and shall not contribute with, any other insurance, whether primary, excess, contingent, or on any other basis. This condition does not apply to insurance specifically purchased to be excess of this policy.",
+      "other_insurance_type": "EXCESS",
+      "endorsements": [
+        {
+          "endorsement_no": "UMB-FF-001",
+          "label": "Follow-Form Endorsement",
+          "text": "Coverage under this policy follows the terms, conditions, and exclusions of the underlying primary policy listed in the schedule, except as modified herein.",
+          "effect": "NEUTRAL"
+        }
+      ],
+      "exclusions": [],
+      "has_anti_stacking_clause": false,
+      "has_non_cumulation_clause": false,
+      "has_continuous_trigger_endorsement": false
+    }
+  ],
+
+  "state_rule": {
+    "state_code": "TX",
+    "name": "Texas",
+    "trigger_test": "Eight-corners rule. Texas determines the duty to defend by comparing the four corners of the underlying complaint to the four corners of the policy, taking the allegations as true and resolving any ambiguity in favor of the insured. If any allegation potentially falls within coverage, the duty to defend attaches. Extrinsic evidence is admissible only in narrow circumstances (e.g. when an issue is wholly independent of the merits and the rule is impractical to apply).",
+    "trigger_citations": [
+      "GuideOne Elite Ins. Co. v. Fielder Rd. Baptist Church, 197 S.W.3d 305 (Tex. 2006)",
+      "Northfield Ins. Co. v. Loving Home Care, Inc., 363 F.3d 523 (5th Cir. 2004)",
+      "Zurich Am. Ins. Co. v. Nokia, Inc., 268 S.W.3d 487 (Tex. 2008)"
+    ],
+    "priority_rule": "Texas gives effect to clear and unambiguous policy language. When two or more policies cover the same loss, the priority of coverage is determined by reading each policy's Other Insurance clause and giving effect to its terms. Where a policy's Other Insurance clause is silent or designates the policy as primary, that policy is primary. Where another policy contains a pure-excess Other Insurance clause, that policy is excess to the silent/primary policy. When two or more triggered policies all contain pure-excess Other Insurance clauses (mutually repugnant), Texas reads the clauses together and apportions liability among the co-excess policies pro-rata by limits unless the policy language directs otherwise.",
+    "priority_citations": [
+      "Mid-Continent Ins. Co. v. Liberty Mut. Ins. Co., 236 S.W.3d 765 (Tex. 2007)",
+      "Hardware Dealers Mut. Fire Ins. Co. v. Farmers Ins. Exch., 444 S.W.2d 583 (Tex. 1969)",
+      "Trinity Universal Ins. Co. v. Employers Mut. Cas. Co., 592 F.3d 687 (5th Cir. 2010)"
+    ],
+    "exhaustion_rule": "vertical",
+    "exhaustion_citations": [
+      "Keck, Mahin & Cate v. Nat'l Union Fire Ins. Co. of Pittsburgh, 20 S.W.3d 692 (Tex. 2000)",
+      "Plantation Pipe Line Co. v. Highlands Ins. Co., 444 S.W.2d 583 (Tex. 1969)"
+    ]
+  }
+}
