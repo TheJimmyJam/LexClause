@@ -421,20 +421,26 @@ function parseJsonFromClaude(text) {
   return JSON.parse(cleaned)
 }
 
-async function callClaude({ system, userContent, max_tokens = 4096 }) {
-  return await callClaudeMessages(system, [{ role: 'user', content: userContent }], max_tokens)
+async function callClaude({ system, userContent, max_tokens = 4096, timeoutMs = undefined, maxAttempts = undefined }) {
+  return await callClaudeMessages(
+    system,
+    [{ role: 'user', content: userContent }],
+    max_tokens,
+    { timeoutMs, maxAttempts },
+  )
 }
 
-async function callClaudeMessages(system, messages, max_tokens = 4096) {
+async function callClaudeMessages(system, messages, max_tokens = 4096, opts: { timeoutMs?: number, maxAttempts?: number } = {}) {
   // Retry with exponential backoff for transient errors (429 rate-limit, 5XX
   // overloaded/timeout). Real 4XX errors (auth, bad request) bubble up
-  // immediately. Up to 4 attempts total: 0s, 1s, 3s, 7s.
-  // Each attempt also has a 120s wall-clock timeout — without this, a hung
-  // Anthropic socket blocks the function's background task forever and the
-  // analysis stays in 'running' state until Supabase reaps the instance.
+  // immediately. Up to 3 attempts total: 0s, 1s, 3s.
+  // Per-attempt timeout defaults to 55s — this keeps the total worst-case
+  // call time well under Supabase's background-task budget so the engine
+  // can complete (or fail cleanly) before the instance is reaped.
+  // Callers can override timeoutMs / maxAttempts for slower modes.
   const RETRYABLE_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529])
-  const MAX_ATTEMPTS = 4
-  const PER_ATTEMPT_TIMEOUT_MS = 120_000
+  const MAX_ATTEMPTS = opts.maxAttempts ?? 3
+  const PER_ATTEMPT_TIMEOUT_MS = opts.timeoutMs ?? 55_000
   let lastErr = null
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -749,6 +755,10 @@ async function handleExtract(supabase, policyId) {
         { type: 'text', text: 'Extract the policy data from the attached PDF. Return only the JSON object - no prose.' },
       ],
       max_tokens: 4096,
+      // PDF reads are synchronous (not background-tasked), so a longer
+      // per-attempt timeout is safe here.
+      timeoutMs: 90_000,
+      maxAttempts: 3,
     })
     const text = claudeResp.content?.[0]?.text || ''
     parsed = parseJsonFromClaude(text)
@@ -1179,7 +1189,10 @@ async function startCoveragePriority(supabase, matterId, opts: any = {}) {
 async function processCoveragePriority(supabase, ctx) {
   const { analysis, matter, policies, rule, userPayload } = ctx
   try {
-    const MAX_ATTEMPTS = 3
+    // 2 validation attempts keeps total worst-case Claude time under
+    // Supabase's background-task budget (~150s CPU). Each callClaudeMessages
+    // call uses the default 55s timeout with up to 3 attempts.
+    const MAX_ATTEMPTS = 2
     const conversation = [{ role: 'user', content: [{ type: 'text', text: userPayload }] }]
     let parsed: any = null
     let validationErrors: any[] = []
