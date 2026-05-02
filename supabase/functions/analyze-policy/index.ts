@@ -1210,7 +1210,7 @@ async function processCoveragePriority(supabase, ctx) {
 
     while (attempt < MAX_ATTEMPTS) {
       attempt++
-      const claudeResp = await callClaudeMessages(COVERAGE_PRIORITY_SYSTEM, conversation, 2048, { timeoutMs: 90_000, maxAttempts: 1 })
+      const claudeResp = await callClaudeMessages(COVERAGE_PRIORITY_SYSTEM, conversation, 3500, { timeoutMs: 90_000, maxAttempts: 1 })
       const text = claudeResp.content?.[0]?.text || ''
       try {
         parsed = parseJsonFromClaude(text)
