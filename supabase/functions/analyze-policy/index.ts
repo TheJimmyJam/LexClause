@@ -461,10 +461,17 @@ async function callClaudeMessages(system, messages, max_tokens = 4096, opts: { t
         },
         body: JSON.stringify({ model: CLAUDE_MODEL, max_tokens, system, messages }),
       })
-      clearTimeout(timer)
-      if (r.ok) return await r.json()
+      // Do NOT clearTimeout here — keep the abort active while reading the
+      // response body. Claude can be slow to stream the full JSON even after
+      // headers arrive, and we must honour the per-attempt budget end-to-end.
+      if (r.ok) {
+        const json = await r.json()   // abort signal still in effect
+        clearTimeout(timer)
+        return json
+      }
 
       const errText = await r.text()
+      clearTimeout(timer)
       const errMsg  = `Anthropic ${r.status}: ${errText.slice(0, 500)}`
       if (RETRYABLE_STATUSES.has(r.status) && attempt < MAX_ATTEMPTS - 1) {
         lastErr = new Error(errMsg)
