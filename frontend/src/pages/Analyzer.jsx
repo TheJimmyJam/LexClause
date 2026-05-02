@@ -131,7 +131,7 @@ export default function Analyzer() {
     }))
     setFiles(prev => [...prev, ...entries])
 
-    const CONCURRENCY = 4
+    const CONCURRENCY = 2
     const queue = [...entries]
     const worker = async () => {
       while (queue.length) {
@@ -164,8 +164,12 @@ export default function Analyzer() {
         setGoverningState(c.venue_state)
       }
     } catch (e) {
-      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'error', error: String(e?.message || e) } : f))
-      toast.error(`${file.name}: ${e?.message || e}`)
+      // Supabase wraps edge function errors with a generic message; try to surface
+      // the actual cause from the response body if it's available.
+      const rawMsg = e?.message || String(e)
+      const detailMsg = e?.context?.json?.error || e?.context?.error || rawMsg
+      setFiles(prev => prev.map(f => f.id === id ? { ...f, status: 'error', error: detailMsg } : f))
+      toast.error(`${file.name}: ${detailMsg}`)
     }
   }
 
