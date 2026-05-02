@@ -1151,15 +1151,17 @@ async function startCoveragePriority(supabase, matterId, opts: any = {}) {
       attachment_point:       p.attachment_point,
       other_insurance_clause: p.other_insurance_clause,
       other_insurance_type:   p.other_insurance_type,
-      endorsements:           (p.lc_policy_endorsements || []).map((e) => ({
+      // Send label + effect only (not full text) — the full endorsement/exclusion
+      // language can be thousands of tokens per policy and causes generation to
+      // exceed Supabase's 150s wall-clock budget. The coverage-priority engine
+      // needs to know WHAT the endorsement does (effect + label), not every word.
+      endorsements: (p.lc_policy_endorsements || []).map((e) => ({
         endorsement_no: e.endorsement_no,
         label:          e.label,
-        text:           e.text,
         effect:         e.effect,
       })),
       exclusions: (p.lc_policy_exclusions || []).map((e) => ({
         label: e.label,
-        text:  e.text,
       })),
       has_anti_stacking_clause:           !!p.has_anti_stacking_clause,
       has_non_cumulation_clause:          !!p.has_non_cumulation_clause,
