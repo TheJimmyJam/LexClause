@@ -1198,9 +1198,10 @@ async function startCoveragePriority(supabase, matterId, opts: any = {}) {
 async function processCoveragePriority(supabase, ctx) {
   const { analysis, matter, policies, rule, userPayload } = ctx
   try {
-    // 2 validation attempts keeps total worst-case Claude time under
-    // Supabase's background-task budget (~150s CPU). Each callClaudeMessages
-    // call uses the default 55s timeout with up to 3 attempts.
+    // Budget math: 2 validation attempts × 1 internal attempt × 90s timeout = 180s max.
+    // maxAttempts:1 disables internal retries inside callClaudeMessages — the outer
+    // validation loop is already the retry mechanism so doubling up wastes budget.
+    // max_tokens:2048 halves generation time vs 4096 (coverage opinion fits in 2048).
     const MAX_ATTEMPTS = 2
     const conversation = [{ role: 'user', content: [{ type: 'text', text: userPayload }] }]
     let parsed: any = null
@@ -1209,7 +1210,7 @@ async function processCoveragePriority(supabase, ctx) {
 
     while (attempt < MAX_ATTEMPTS) {
       attempt++
-      const claudeResp = await callClaudeMessages(COVERAGE_PRIORITY_SYSTEM, conversation, 4096)
+      const claudeResp = await callClaudeMessages(COVERAGE_PRIORITY_SYSTEM, conversation, 2048, { timeoutMs: 90_000, maxAttempts: 1 })
       const text = claudeResp.content?.[0]?.text || ''
       try {
         parsed = parseJsonFromClaude(text)
