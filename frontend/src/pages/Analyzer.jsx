@@ -307,16 +307,22 @@ export default function Analyzer() {
       await Promise.all(Array.from({ length: POL_CONCURRENCY }, polWorker))
       updateStep('upload', 'done', '')
 
-      // ── 4. extract_terms in parallel + wait for completion (live count) ──
+      // ── 4. extract_terms sequentially to avoid Anthropic TPM rate limits ──
+      // PDF extraction sends the full PDF to Claude. Running all 6 at once
+      // easily exceeds the 30K tokens/minute org limit. Process one at a time
+      // with a 2s gap so the rate-limit window has time to breathe.
       updateStep('extract', 'active', `0 of ${policies.length} parsed`)
-      await Promise.all(policies.map(p => extractPolicyTerms(p.id).catch(e => {
-        console.error('extract_terms failed', p.id, e)
-      })))
-      await waitForPolicyExtractions(
-        policies.map(p => p.id),
-        90_000,
-        (done, total) => updateStep('extract', 'active', `${done} of ${total} parsed`),
-      )
+      let extracted = 0
+      for (const p of policies) {
+        try {
+          await extractPolicyTerms(p.id)
+        } catch (e) {
+          console.error('extract_terms failed', p.id, e)
+        }
+        extracted++
+        updateStep('extract', 'active', `${extracted} of ${policies.length} parsed · ${p.source_filename || ''}`)
+        if (extracted < policies.length) await new Promise(r => setTimeout(r, 2000))
+      }
       updateStep('extract', 'done', '')
 
       // ── 5. Coverage_priority — single state or multi-state ──────────────
